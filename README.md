@@ -25,6 +25,7 @@ https://probe.rs/docs/getting-started/probe-setup/
 ## Development
 
 ```sh
+set DEFMT_LOG=info
 cargo watch --clear --delay 1 --exec "run --bin main"
 ```
 
