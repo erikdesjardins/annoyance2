@@ -6,15 +6,26 @@ Digital version of https://github.com/erikdesjardins/annoyance. Intended to run 
 
 ## Setup
 
+Add the target corresponding to Cortex-M3:
+
 ```sh
-cargo install flip-link probe-run
 rustup target add thumbv7m-none-eabi
 ```
+
+Install tools for linking/flashing:
+
+```sh
+cargo install flip-link probe-run
+```
+
+Follow `probe-rs` docs to install drivers for flashing:
+
+https://probe.rs/docs/getting-started/probe-setup/
 
 ## Development
 
 ```sh
-cargo watch --clear --delay 1 --exec check
+cargo watch --clear --delay 1 --exec "run --bin main"
 ```
 
 ## Testing

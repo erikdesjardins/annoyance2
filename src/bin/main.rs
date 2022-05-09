@@ -53,7 +53,9 @@ mod app {
         defmt::info!("idle");
 
         loop {
-            cortex_m::asm::wfi();
+            // Note that using `wfi` here breaks debugging,
+            // so if desired we should only do that in release mode.
+            continue;
         }
     }
 
