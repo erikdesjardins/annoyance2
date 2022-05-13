@@ -24,9 +24,17 @@ https://probe.rs/docs/getting-started/probe-setup/
 
 ## Development
 
+### Run on device
+
 ```sh
 set DEFMT_LOG=info
 cargo watch --clear --delay 1 --exec "run --bin main"
+```
+
+### Misc
+
+```
+cargo objdump --release --bin main -- --disassemble --no-show-raw-insn --print-imm-hex
 ```
 
 ## Testing
