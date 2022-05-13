@@ -36,21 +36,38 @@ mod app {
         //                                             |
         //                                             -> ADC prescaler -> ADCCLK
         //                                                 / 2,4,6,8
-        //
+
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
+
+        // PLLMUL @ x9 (max 72MHz)
+        let sysclk = 72.MHz();
+
+        // for timer outputs, only need >= 1MHz since minimum pulse duration is 1us
+        // APB1 prescaler @ /8 (max 36MHz)
+        let pclk1 = 9.MHz();
+        // APB2 prescaler @ /8 (max 72MHz)
+        let pclk2 = 9.MHz();
+
+        // for adc, want as low as possible since we're sampling audio at 48kHz
+        // ADC prescaler @ /8 (max 14MHz, min 600kHz)
+        let adcclk = 1125.kHz();
+
         let clocks = rcc
             .cfgr
             .use_hse(8.MHz()) // use external oscillator (required to get max 72MHz sysclk)
-            .sysclk(72.MHz()) // PLLMUL @ x9 (max 72MHz)
-            // for timer outputs, only need >= 1MHz since minimum pulse duration is 1us
-            .pclk1(9.MHz()) // APB1 prescaler @ /8 (max 36MHz)
-            .pclk2(9.MHz()) // APB2 prescaler @ /8 (max 72MHz)
-            // for adc, want as low as possible since we're sampling audio at 48kHz
-            .adcclk(1125.kHz()) // ADC prescaler @ /8 (max 14MHz, min 600kHz)
+            .sysclk(sysclk)
+            .pclk1(pclk1)
+            .pclk2(pclk2)
+            .adcclk(adcclk)
             .freeze(&mut flash.acr);
 
-        defmt::info!("Configuring monotomnic timer...");
+        assert!(sysclk == clocks.sysclk());
+        assert!(pclk1 == clocks.pclk1());
+        assert!(pclk2 == clocks.pclk2());
+        assert!(adcclk == clocks.adcclk());
+
+        defmt::info!("Configuring monotonic timer...");
 
         let mono = DwtSystick::new(
             &mut cx.core.DCB,
