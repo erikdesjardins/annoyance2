@@ -23,15 +23,28 @@ mod app {
 
         // Setup clocks
         // See clock tree in https://www.st.com/resource/en/datasheet/stm32f103c8.pdf
+        // Rough layout:
+        //
+        //   SYSCLK -> AHB prescaler -> APB1 prescaler -> PCLK1
+        //              / 1,2..512   |   / 1,2,4,8,16
+        //                           |
+        //                           -> APB2 prescaler -> PCLK2
+        //                               / 1,2,4,8,16  |
+        //                                             |
+        //                                             -> ADC prescaler -> ADCCLK
+        //                                                 / 2,4,6,8
+        //
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
         let clocks = rcc
             .cfgr
             .use_hse(8.MHz()) // use external oscillator (required to get max 72MHz sysclk)
-            .sysclk(72.MHz()) // max 72 MHz
-            // .pclk1(36.MHz()) // max 36 MHz
-            // .pclk2(72.MHz()) // max 72 MHz
-            // .adcclk(9.MHz()) // max 14 MHz (but want as slow as possible [that is, pclk2/8] since we're sampling audio)
+            .sysclk(72.MHz()) // PLLMUL @ x9 (max 72MHz)
+            // for timer outputs, only need >= 1MHz since minimum pulse duration is 1us
+            .pclk1(9.MHz()) // APB1 prescaler @ /8 (max 36MHz)
+            .pclk2(9.MHz()) // APB2 prescaler @ /8 (max 72MHz)
+            // for adc, want as low as possible since we're sampling audio at 48kHz
+            .adcclk(1125.kHz()) // ADC prescaler @ /8 (max 14MHz, min 600kHz)
             .freeze(&mut flash.acr);
 
         defmt::info!("configured clocks");
