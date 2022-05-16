@@ -17,6 +17,7 @@ mod app {
     use stm32f1xx_hal::dma::{dma1, CircBuffer, Event};
     use stm32f1xx_hal::gpio::{Analog, Output, Pin, PinState, PushPull, CRL, PC13};
     use stm32f1xx_hal::prelude::*;
+    use stm32f1xx_hal::timer::Tim2NoRemap;
 
     #[monotonic(binds = SysTick, default = true)]
     type DwtMono = DwtSystick<{ config::SYSCLK_HZ }>;
@@ -35,10 +36,16 @@ mod app {
 
     #[init]
     fn init(mut cx: init::Context) -> (Shared, Local, init::Monotonics) {
-        defmt::info!("Configuring clocks...");
+        defmt::info!("Starting init...");
 
+        let mut afio = cx.device.AFIO.constrain();
+        let dma1 = cx.device.DMA1.split();
         let mut flash = cx.device.FLASH.constrain();
+        let mut gpioa = cx.device.GPIOA.split();
+        let mut gpioc = cx.device.GPIOC.split();
         let rcc = cx.device.RCC.constrain();
+
+        defmt::info!("Configuring clocks...");
 
         let clocks = rcc
             .cfgr
@@ -56,7 +63,6 @@ mod app {
 
         defmt::info!("Configuring ADC DMA transfer...");
 
-        let dma1 = cx.device.DMA1.split();
         let mut dma1_ch1 = dma1.1;
         // Enable interrupts on DMA1_CHANNEL1
         dma1_ch1.listen(Event::HalfTransfer);
@@ -65,10 +71,21 @@ mod app {
         let mut adc1 = Adc::adc1(cx.device.ADC1, clocks);
         adc1.set_sample_time(config::ADC_SAMPLE);
 
-        let mut gpioa = cx.device.GPIOA.split();
         let adc_ch0 = gpioa.pa0.into_analog(&mut gpioa.crl);
 
         let adc_dma = adc1.with_dma(adc_ch0, dma1_ch1);
+
+        defmt::info!("Configuring PWM virtual ground...");
+
+        let tim2_ch2 = gpioa.pa1.into_alternate_push_pull(&mut gpioa.crl);
+
+        let mut pwm = cx
+            .device
+            .TIM2
+            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch2, &mut afio.mapr, config::PCLK1, &clocks)
+            .split();
+        pwm.enable();
+        pwm.set_duty(pwm.get_max_duty() / 2);
 
         defmt::info!("Configuring monotonic timer...");
 
@@ -81,7 +98,6 @@ mod app {
 
         defmt::info!("Configuring debug indicator LED...");
 
-        let mut gpioc = cx.device.GPIOC.split();
         let led = gpioc
             .pc13
             .into_push_pull_output_with_state(&mut gpioc.crh, PinState::High);
@@ -90,6 +106,7 @@ mod app {
 
         let buf =
             singleton!(: [[u16; config::ADC_BUF_LEN]; 2] = [[0; config::ADC_BUF_LEN]; 2]).unwrap();
+
         let adc_dma_buf = adc_dma.circ_read(buf);
 
         defmt::info!("Finished init.");
