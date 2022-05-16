@@ -20,6 +20,7 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "dwt-systick-monotonic",
+ "fugit",
  "panic-probe",
  "stm32f1xx-hal",
 ]
