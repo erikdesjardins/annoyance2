@@ -84,7 +84,7 @@ mod app {
         let mut gpioc = cx.device.GPIOC.split();
         let led = gpioc
             .pc13
-            .into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
+            .into_push_pull_output_with_state(&mut gpioc.crh, PinState::High);
 
         defmt::info!("Starting ADC DMA transfer...");
 
