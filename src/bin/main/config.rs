@@ -66,3 +66,7 @@ pub const ADC_SAMPLE_PER_SEC: u32 = ADCCLK.to_Hz() * 10 / ADC_SAMPLE_CYC_X10;
 
 // Swap buffers ~32 times per second, to be able to play 1/32 notes
 pub const ADC_BUF_LEN: usize = ADC_SAMPLE_PER_SEC as usize / 32;
+
+// Scale up ADC buffer to next power of 2, since that's required for Radix-2 algorithm
+pub const FFT_BUF_LEN: usize = ADC_BUF_LEN.next_power_of_two();
+pub const FFT_BUF_LEN_LOG2: usize = usize::BITS as usize - 1 - FFT_BUF_LEN.leading_zeros() as usize;

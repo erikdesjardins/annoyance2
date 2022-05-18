@@ -1,15 +1,15 @@
 #![no_main]
 #![no_std]
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::needless_range_loop)]
 
 use annoyance2 as _; // global logger + panicking-behavior + memory layout
 
+mod adc;
 mod config;
-mod fft;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
 mod app {
-    use crate::{config, fft};
+    use crate::{adc, config};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use stm32f1xx_hal::adc::{Adc, AdcDma, Continuous};
@@ -27,10 +27,11 @@ mod app {
 
     #[local]
     struct Local {
-        adc_dma_buf: CircBuffer<
+        adc_dma_transfer: CircBuffer<
             [u16; config::ADC_BUF_LEN],
             AdcDma<ADC1, Pin<Analog, CRL, 'A', 0>, Continuous, dma1::C1>,
         >,
+        fft_buf: &'static mut [i16; config::FFT_BUF_LEN],
         _debug_led: PC13<Output<PushPull>>,
     }
 
@@ -104,17 +105,19 @@ mod app {
 
         defmt::info!("Starting ADC DMA transfer...");
 
-        let buf =
+        let adc_dma_buf =
             singleton!(: [[u16; config::ADC_BUF_LEN]; 2] = [[0; config::ADC_BUF_LEN]; 2]).unwrap();
+        let fft_buf = singleton!(: [i16; config::FFT_BUF_LEN] = [0; config::FFT_BUF_LEN]).unwrap();
 
-        let adc_dma_buf = adc_dma.circ_read(buf);
+        let adc_dma_transfer = adc_dma.circ_read(adc_dma_buf);
 
         defmt::info!("Finished init.");
 
         (
             Shared {},
             Local {
-                adc_dma_buf,
+                adc_dma_transfer,
+                fft_buf,
                 _debug_led: led,
             },
             init::Monotonics(mono),
@@ -130,21 +133,31 @@ mod app {
         }
     }
 
-    #[task(binds = DMA1_CHANNEL1, local = [adc_dma_buf], priority = 1)]
+    #[task(
+        binds = DMA1_CHANNEL1,
+        local = [
+            adc_dma_transfer,
+            fft_buf,
+        ],
+        priority = 1
+    )]
     fn adc_dma(cx: adc_dma::Context) {
         defmt::info!("Started processing ADC buffer...");
 
         let start = monotonics::now();
 
-        let res = cx.local.adc_dma_buf.peek(|half, _| fft::process(half));
+        let res = cx
+            .local
+            .adc_dma_transfer
+            .peek(|half, _| adc::process(half, cx.local.fft_buf));
 
         let duration = monotonics::now() - start;
 
         match res {
-            Ok((min, max)) => defmt::info!(
-                "Finished processing ADC buffer after {}us. ({} to {})",
+            Ok((max_i, max)) => defmt::info!(
+                "Finished processing ADC buffer after {}us. (max freq index {} amplitude {})",
                 duration.to_micros(),
-                min,
+                max_i,
                 max
             ),
             Err(_) => defmt::warn!(
