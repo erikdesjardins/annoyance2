@@ -3,6 +3,7 @@ use core::mem;
 use num_complex::Complex;
 
 mod fft;
+mod window;
 
 #[inline(never)]
 pub fn process(
@@ -13,14 +14,19 @@ pub fn process(
     for i in 0..config::ADC_BUF_LEN {
         scratch[i] = (buf[i] as i16).wrapping_sub(i16::MAX / 2);
     }
-    // zero remaining buffer--it needs to have power-of-2 len
-    // also, apparently you can pad your sample with zeroes and this increases frequency resolution?
+
+    // apply window function to sampled data
+    window::rectangle((&mut scratch[0..config::ADC_BUF_LEN]).try_into().unwrap());
+
+    // zero remaining buffer (to get up to power-of-2)
+    // apparently you can pad your sample with zeroes and this increases frequency resolution?
     // spectral interpolation is magic
     for i in config::ADC_BUF_LEN..config::FFT_BUF_LEN {
         scratch[i] = 0;
     }
 
     let data = complex_from_adjacent_values(scratch);
+
     fft::radix2(data);
 
     let mut max_i = 0;
