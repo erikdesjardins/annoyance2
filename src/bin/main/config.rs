@@ -65,7 +65,9 @@ pub const ADC_SAMPLE: SampleTime = match ADC_SAMPLE_CYC_X10 {
 pub const ADC_SAMPLE_PER_SEC: u32 = ADCCLK.to_Hz() * 10 / ADC_SAMPLE_CYC_X10;
 
 // Swap buffers ~32 times per second, to be able to play 1/32 notes
-pub const ADC_BUF_LEN: usize = ADC_SAMPLE_PER_SEC as usize / 32;
+pub const ADC_BUFFERS_PER_SEC: usize = 32;
+
+pub const ADC_BUF_LEN: usize = ADC_SAMPLE_PER_SEC as usize / ADC_BUFFERS_PER_SEC;
 
 #[allow(dead_code)]
 pub enum Window {

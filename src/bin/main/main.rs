@@ -149,7 +149,7 @@ mod app {
         let res = cx
             .local
             .adc_dma_transfer
-            .peek(|half, _| adc::process(half, cx.local.fft_buf));
+            .peek(|half, _| adc::process_buffer(half, cx.local.fft_buf));
 
         let duration = monotonics::now() - start;
 
