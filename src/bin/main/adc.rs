@@ -16,7 +16,12 @@ pub fn process(
     }
 
     // apply window function to sampled data
-    window::rectangle((&mut scratch[0..config::ADC_BUF_LEN]).try_into().unwrap());
+    let nonzero_samples: &mut [i16; config::ADC_BUF_LEN] =
+        (&mut scratch[0..config::ADC_BUF_LEN]).try_into().unwrap();
+    match config::FFT_WINDOW {
+        config::Window::Rectangle => window::rectangle(nonzero_samples),
+        config::Window::BlackmanHarris => window::blackman_harris(nonzero_samples),
+    }
 
     // zero remaining buffer (to get up to power-of-2)
     // apparently you can pad your sample with zeroes and this increases frequency resolution?

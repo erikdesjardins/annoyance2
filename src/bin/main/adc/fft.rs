@@ -11,15 +11,12 @@ const N_LOG2: usize = config::FFT_BUF_LEN_LOG2 - 1;
 
 const _: () = assert!(N.is_power_of_two());
 
-// Fixed-point i16 sin values, used to generate twiddle factors.
-include!(concat!(env!("OUT_DIR"), "/sin_table.rs"));
-
-const _: () = assert!(SIN_TABLE.len() == N);
-
 /// Twiddle factors, used in the Radix-2 FFT algorithm.
 // put in RAM: ~300us improvement
 #[link_section = ".data.adc::fft::PFW"]
 static PFW: [Complex<i16>; N / 4] = {
+    const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/sin_table.rs"));
+
     let mut twiddle = [Complex::new(0, 0); N / 4];
 
     let mut iw = 0;
