@@ -32,6 +32,11 @@ static PFW: [Complex<i16>; N / 4] = {
     twiddle
 };
 
+/// Run in-place Radix-2 FFT.
+///
+/// Results are as follows:
+/// - index 0 to N/2: positive frequencies, with DC at 0 and Nyquist frequency at N/2
+/// - index N/2 to N: negative frequencies
 #[inline(never)]
 pub fn radix2(pfs: &mut [Complex<i16>; N]) {
     for stage in 0..N_LOG2 {

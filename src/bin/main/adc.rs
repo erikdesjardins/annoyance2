@@ -1,4 +1,5 @@
 use crate::config;
+use crate::fixed::{amplitude, phase};
 use core::mem;
 use num_complex::Complex;
 
@@ -9,7 +10,7 @@ mod window;
 pub fn process_buffer(
     input: &[u16; config::ADC_BUF_LEN],
     scratch: &mut [i16; config::FFT_BUF_LEN],
-) -> (i16, i16) {
+) {
     // convert unsigned samples (0 = 0V, u16::MAX = Vcc) to signed samples centered at Vcc/2 (i16::MIN = 0V, 0 = Vcc/2, i16::MAX = Vcc)
     for i in 0..config::ADC_BUF_LEN {
         scratch[i] = (input[i] as i16).wrapping_sub(i16::MAX / 2);
@@ -34,17 +35,28 @@ pub fn process_buffer(
     let data = complex_from_adjacent_values(scratch);
     fft::radix2(data);
 
-    let mut max_i = 0;
-    let mut max = i16::MIN;
+    let mut max_amplitude = 0;
+    let mut freq_at_max = 0;
+    let mut phase_at_max = 0;
+    // only look at positive, non-DC frequencies in first half of array
+    for i in 2..data.len() / 2 {
+        let freq = i as u32 * config::FFT_FREQ_RESOLUTION_X1000 / 1000;
+        let amplitude = amplitude(data[i]);
+        let phase = phase(data[i]);
 
-    for (i, freq) in data.iter().copied().enumerate() {
-        if freq.re > max {
-            max_i = i as i16;
-            max = freq.re;
+        if amplitude > max_amplitude {
+            max_amplitude = amplitude;
+            freq_at_max = freq;
+            phase_at_max = phase;
         }
     }
-
-    (max_i, max)
+    defmt::info!(
+        "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles",
+        max_amplitude,
+        freq_at_max,
+        phase_at_max,
+        u16::MAX,
+    );
 }
 
 fn complex_from_adjacent_values<T>(

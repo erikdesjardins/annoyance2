@@ -80,3 +80,6 @@ pub const FFT_BUF_LEN: usize = ADC_BUF_LEN.next_power_of_two();
 pub const FFT_BUF_LEN_LOG2: usize = usize::BITS as usize - 1 - FFT_BUF_LEN.leading_zeros() as usize;
 
 pub const FFT_WINDOW: Window = Window::BlackmanHarris;
+
+// Each FFT bin is this many Hz apart
+pub const FFT_FREQ_RESOLUTION_X1000: u32 = ADC_SAMPLE_PER_SEC * 1000 / FFT_BUF_LEN as u32;

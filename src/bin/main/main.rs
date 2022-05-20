@@ -6,6 +6,7 @@ use annoyance2 as _; // global logger + panicking-behavior + memory layout
 
 mod adc;
 mod config;
+mod fixed;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
 mod app {
@@ -154,11 +155,9 @@ mod app {
         let duration = monotonics::now() - start;
 
         match res {
-            Ok((max_i, max)) => defmt::info!(
-                "Finished processing ADC buffer after {}us. (max freq index {} amplitude {})",
-                duration.to_micros(),
-                max_i,
-                max
+            Ok(()) => defmt::info!(
+                "Finished processing ADC buffer after {}us.",
+                duration.to_micros()
             ),
             Err(_) => defmt::warn!(
                 "ADC buffer processing did not complete in time (took {}us).",
