@@ -16,9 +16,9 @@ defmt-rtt = "0.3"
 dwt-systick-monotonic = "1"
 embedded-hal = "0.2"
 fixed = "1"
+fixed-sqrt = "0.2"
 fugit = "0.3"
 num-complex = { version = "0.4", default-features = false }
-num-integer = { version = "0.1", default-features = false }
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 stm32f1xx-hal = { version = "0.9", features = ["stm32f103", "medium", "rtic"] }
 

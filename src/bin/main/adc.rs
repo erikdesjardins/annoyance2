@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude, phase};
+use crate::fixed::{amplitude_squared, phase, scale_by, sqrt};
 use core::mem;
 use num_complex::Complex;
 
@@ -41,28 +41,7 @@ pub fn process_buffer(
     let data = complex_from_adjacent_values(scratch);
     fft::radix2(data);
 
-    let mut max_amplitude = 0;
-    let mut freq_at_max = 0;
-    let mut phase_at_max = 0;
-    // only look at positive, non-DC frequencies in first half of array
-    for i in 2..data.len() / 2 {
-        let freq = i as u32 * config::FFT_FREQ_RESOLUTION_X1000 / 1000;
-        let amplitude = amplitude(data[i]);
-        let phase = phase(data[i]);
-
-        if amplitude > max_amplitude {
-            max_amplitude = amplitude;
-            freq_at_max = freq;
-            phase_at_max = phase;
-        }
-    }
-    defmt::info!(
-        "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles",
-        max_amplitude,
-        freq_at_max,
-        phase_at_max,
-        u16::MAX,
-    );
+    log_fft_stats(data);
 }
 
 fn complex_from_adjacent_values<T>(
@@ -71,4 +50,35 @@ fn complex_from_adjacent_values<T>(
     assert!(x.len() % 2 == 0);
     // Safety: Complex<T> is layout-compatible with [T; 2]
     unsafe { mem::transmute(x) }
+}
+
+#[inline(never)]
+fn log_fft_stats(data: &mut [Complex<i16>; config::FFT_BUF_LEN / 2]) {
+    let mut max_amplitude_squared = 0;
+    let mut i_at_max = 0;
+    let mut val_at_max = Complex::new(0, 0);
+
+    // only look at positive, non-DC frequencies in first half of array
+    for i in 2..data.len() / 2 {
+        let amplitude_squared = amplitude_squared(data[i]);
+        if amplitude_squared > max_amplitude_squared {
+            max_amplitude_squared = amplitude_squared;
+            i_at_max = i as u32;
+            val_at_max = data[i];
+        }
+    }
+
+    let max_amplitude = sqrt(max_amplitude_squared);
+    let freq_at_max = i_at_max * config::FFT_FREQ_RESOLUTION_X1000 / 1000;
+    let phase_at_max = phase(val_at_max);
+    let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
+
+    defmt::info!(
+        "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles (~{} deg)",
+        max_amplitude,
+        freq_at_max,
+        phase_at_max,
+        u32::MAX,
+        deg_at_max,
+    );
 }
