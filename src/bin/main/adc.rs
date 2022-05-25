@@ -11,32 +11,30 @@ pub fn process_buffer(
     input: &[u16; config::ADC_BUF_LEN_PER_CHANNEL * 2],
     scratch: &mut [i16; config::FFT_BUF_LEN],
 ) {
+    let (values, padding) = scratch.split_at_mut(config::ADC_BUF_LEN_PER_CHANNEL);
+    let values: &mut [i16; config::ADC_BUF_LEN_PER_CHANNEL] = values.try_into().unwrap();
+
     // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
-    for i in 0..config::ADC_BUF_LEN_PER_CHANNEL {
-        // subtracting the two signals naturally cancels out the Vcc/2 offset
-        let a = input[i * 2];
-        let b = input[i * 2 + 1];
-        let difference = b as i32 - a as i32;
-        debug_assert!(difference >= i16::MIN as i32);
-        debug_assert!(difference <= i16::MAX as i32);
-        scratch[i] = difference as i16;
-    }
+    values
+        .iter_mut()
+        .zip(input.chunks_exact(2))
+        .for_each(|(value, channels)| {
+            // subtracting the two signals naturally cancels out the Vcc/2 offset
+            let difference = channels[1] as i32 - channels[0] as i32;
+            debug_assert!(difference >= i16::MIN as i32);
+            debug_assert!(difference <= i16::MAX as i32);
+            *value = difference as i16;
+        });
 
     // zero remaining buffer (to get up to power-of-2)
     // apparently you can pad your sample with zeroes and this increases frequency resolution?
     // spectral interpolation is magic
-    for i in config::ADC_BUF_LEN_PER_CHANNEL..config::FFT_BUF_LEN {
-        scratch[i] = 0;
-    }
+    padding.fill(0);
 
     // apply window function
-    let nonzero_samples: &mut [i16; config::ADC_BUF_LEN_PER_CHANNEL] = (&mut scratch
-        [0..config::ADC_BUF_LEN_PER_CHANNEL])
-        .try_into()
-        .unwrap();
     match config::FFT_WINDOW {
-        config::Window::Rectangle => window::rectangle(nonzero_samples),
-        config::Window::BlackmanHarris => window::blackman_harris(nonzero_samples),
+        config::Window::Rectangle => window::rectangle(values),
+        config::Window::BlackmanHarris => window::blackman_harris(values),
     }
 
     // run fft
