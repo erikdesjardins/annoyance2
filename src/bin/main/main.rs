@@ -69,7 +69,7 @@ mod app {
             AdcDma<ADC1, AdcPins, Scan, dma1::C1>,
         >,
         fft_buf: &'static mut [i16; config::FFT_BUF_LEN],
-        _debug_led: pins::C13_DEBUG_LED,
+        debug_led: pins::C13_DEBUG_LED,
     }
 
     #[init]
@@ -156,7 +156,7 @@ mod app {
             Local {
                 adc_dma_transfer,
                 fft_buf,
-                _debug_led: led,
+                debug_led: led,
             },
             init::Monotonics(mono),
         )
@@ -176,6 +176,7 @@ mod app {
         local = [
             adc_dma_transfer,
             fft_buf,
+            debug_led,
         ],
         priority = 1
     )]
@@ -183,12 +184,14 @@ mod app {
         defmt::info!("Started processing ADC buffer...");
 
         let start = monotonics::now();
+        cx.local.debug_led.set_low();
 
         let res = cx
             .local
             .adc_dma_transfer
             .peek(|half, _| adc::process_buffer(half, cx.local.fft_buf));
 
+        cx.local.debug_led.set_high();
         let duration = monotonics::now() - start;
 
         match res {
