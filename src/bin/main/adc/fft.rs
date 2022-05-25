@@ -38,6 +38,7 @@ static PFW: [Complex<i16>; N / 4] = {
 /// - index 0 to N/2: positive frequencies, with DC at 0 and Nyquist frequency at N/2
 /// - index N/2 to N: negative frequencies
 #[inline(never)]
+#[rustfmt::skip]
 pub fn radix2(pfs: &mut [Complex<i16>; N]) {
     for stage in 0..N_LOG2 {
         let stride = N >> (1 + stage);
@@ -80,18 +81,14 @@ pub fn radix2(pfs: &mut [Complex<i16>; N]) {
                 pfs[pa + j] = ft1a;
                 pfs[pb + j] = ft1b;
                 // cmul
-                let tmp =
-                    (i32::from(ft2a.re) * i32::from(PFW[iw].re)) - (i32::from(ft2a.im) * i32::from(PFW[iw].im));
+                let tmp = (i32::from(ft2a.re) * i32::from(PFW[iw].re)) - (i32::from(ft2a.im) * i32::from(PFW[iw].im));
                 pfs[qa + j].re = (tmp >> 15) as i16;
-                let tmp =
-                    (i32::from(ft2a.re) * i32::from(PFW[iw].im)) + (i32::from(ft2a.im) * i32::from(PFW[iw].re));
+                let tmp = (i32::from(ft2a.re) * i32::from(PFW[iw].im)) + (i32::from(ft2a.im) * i32::from(PFW[iw].re));
                 pfs[qa + j].im = (tmp >> 15) as i16;
                 // twiddled cmul
-                let tmp =
-                    (i32::from(ft2b.re) * i32::from(PFW[iw].im)) + (i32::from(ft2b.im) * i32::from(PFW[iw].re));
+                let tmp = (i32::from(ft2b.re) * i32::from(PFW[iw].im)) + (i32::from(ft2b.im) * i32::from(PFW[iw].re));
                 pfs[qb + j].re = (tmp >> 15) as i16;
-                let tmp =
-                    (i32::from(-ft2b.re) * i32::from(PFW[iw].re)) + (i32::from(ft2b.im) * i32::from(PFW[iw].im));
+                let tmp = (i32::from(ft2b.im) * i32::from(PFW[iw].im)) - (i32::from(ft2b.re) * i32::from(PFW[iw].re));
                 pfs[qb + j].im = (tmp >> 15) as i16;
             }
         }
