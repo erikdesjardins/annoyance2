@@ -27,8 +27,8 @@ pub const PCLK1: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(9);
 pub const PCLK2: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(9);
 
 // For adc, want slow enough to sample audio, but fast enough that register writes are acknowledged fast (?)
-// ADC prescaler @ /4 (max 14MHz, min 600kHz)
-pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(2250);
+// ADC prescaler @ /2 (max 14MHz, min 600kHz)
+pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(4500);
 
 // Prolog for clock config:
 //
@@ -49,7 +49,10 @@ pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(2250);
 //
 //   sampleFreq(72000000, 1, APB2_PRE, ADC_PRE, ADC_SAMPLE_x10, FREQ), FREQ #>= 40000, FREQ #=< 50000
 
-// Sample at ADCCLK / 55.5 = 40540 Hz
+// ADC scans two channels for differential input
+pub const ADC_CHANNELS: usize = 2;
+
+// Sample at ADCCLK / 55.5 = 81081 Hz (~40kHz per channel)
 pub const ADC_SAMPLE_CYC_X10: u32 = 555;
 pub const ADC_SAMPLE: SampleTime = match ADC_SAMPLE_CYC_X10 {
     15 => SampleTime::T_1,
@@ -67,7 +70,8 @@ pub const ADC_SAMPLE_PER_SEC: u32 = ADCCLK.to_Hz() * 10 / ADC_SAMPLE_CYC_X10;
 // Swap buffers ~32 times per second, to be able to play 1/32 notes
 pub const ADC_BUFFERS_PER_SEC: usize = 32;
 
-pub const ADC_BUF_LEN: usize = ADC_SAMPLE_PER_SEC as usize / ADC_BUFFERS_PER_SEC;
+pub const ADC_BUF_LEN_PER_CHANNEL: usize =
+    ADC_SAMPLE_PER_SEC as usize / ADC_BUFFERS_PER_SEC / ADC_CHANNELS;
 
 #[allow(dead_code)]
 pub enum Window {
@@ -76,7 +80,7 @@ pub enum Window {
 }
 
 // Scale up ADC buffer to next power of 2, since that's required for Radix-2 algorithm
-pub const FFT_BUF_LEN: usize = ADC_BUF_LEN.next_power_of_two();
+pub const FFT_BUF_LEN: usize = ADC_BUF_LEN_PER_CHANNEL.next_power_of_two();
 pub const FFT_BUF_LEN_LOG2: usize = usize::BITS as usize - 1 - FFT_BUF_LEN.leading_zeros() as usize;
 
 pub const FFT_WINDOW: Window = Window::BlackmanHarris;

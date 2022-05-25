@@ -9,19 +9,55 @@ mod config;
 mod fixed;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
+
 mod app {
     use crate::{adc, config};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
-    use stm32f1xx_hal::adc::{Adc, AdcDma, Continuous};
+    use embedded_hal::adc::Channel;
+    use stm32f1xx_hal::adc::{Adc, AdcDma, ChannelTimeSequence, Scan, SetChannels};
     use stm32f1xx_hal::device::ADC1;
     use stm32f1xx_hal::dma::{dma1, CircBuffer, Event};
-    use stm32f1xx_hal::gpio::{Analog, Output, Pin, PinState, PushPull, CRL, PC13};
+    use stm32f1xx_hal::gpio::PinState;
     use stm32f1xx_hal::prelude::*;
     use stm32f1xx_hal::timer::Tim2NoRemap;
 
     #[monotonic(binds = SysTick, default = true)]
     type DwtMono = DwtSystick<{ config::SYSCLK_HZ }>;
+
+    #[allow(non_camel_case_types)]
+    mod pins {
+        use stm32f1xx_hal::gpio::{Alternate, Analog, Output, Pin, PushPull, CRH, CRL};
+
+        pub type A0_ADC1C0 = Pin<Analog, CRL, 'A', 0>;
+        pub type A1_ADC1C1 = Pin<Analog, CRL, 'A', 1>;
+        pub type A2_PWM_VIRT_GND = Pin<Alternate<PushPull>, CRL, 'A', 2>;
+        // pub type A8_TIM1C1_PULSE = Pin<Digital, CRL, 'A', 8>;
+        pub type C13_DEBUG_LED = Pin<Output<PushPull>, CRH, 'C', 13>;
+    }
+
+    pub struct AdcPins(pins::A0_ADC1C0, pins::A1_ADC1C1);
+
+    impl AdcPins {
+        fn channels() -> [u8; 2] {
+            [
+                <pins::A0_ADC1C0 as Channel<ADC1>>::channel(),
+                <pins::A1_ADC1C1 as Channel<ADC1>>::channel(),
+            ]
+        }
+    }
+
+    impl SetChannels<AdcPins> for Adc<ADC1> {
+        fn set_samples(&mut self) {
+            for channel in AdcPins::channels() {
+                self.set_channel_sample_time(channel, config::ADC_SAMPLE);
+            }
+        }
+        fn set_sequence(&mut self) {
+            self.set_regular_sequence(&AdcPins::channels());
+            self.set_continuous_mode(true);
+        }
+    }
 
     #[shared]
     struct Shared {}
@@ -29,11 +65,11 @@ mod app {
     #[local]
     struct Local {
         adc_dma_transfer: CircBuffer<
-            [u16; config::ADC_BUF_LEN],
-            AdcDma<ADC1, Pin<Analog, CRL, 'A', 0>, Continuous, dma1::C1>,
+            [u16; config::ADC_BUF_LEN_PER_CHANNEL * 2],
+            AdcDma<ADC1, AdcPins, Scan, dma1::C1>,
         >,
         fft_buf: &'static mut [i16; config::FFT_BUF_LEN],
-        _debug_led: PC13<Output<PushPull>>,
+        _debug_led: pins::C13_DEBUG_LED,
     }
 
     #[init]
@@ -73,18 +109,19 @@ mod app {
         let mut adc1 = Adc::adc1(cx.device.ADC1, clocks);
         adc1.set_sample_time(config::ADC_SAMPLE);
 
-        let adc_ch0 = gpioa.pa0.into_analog(&mut gpioa.crl);
+        let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
+        let adc_ch1: pins::A1_ADC1C1 = gpioa.pa1.into_analog(&mut gpioa.crl);
 
-        let adc_dma = adc1.with_dma(adc_ch0, dma1_ch1);
+        let adc_dma = adc1.with_scan_dma(AdcPins(adc_ch0, adc_ch1), dma1_ch1);
 
         defmt::info!("Configuring PWM virtual ground...");
 
-        let tim2_ch2 = gpioa.pa1.into_alternate_push_pull(&mut gpioa.crl);
+        let tim2_ch3: pins::A2_PWM_VIRT_GND = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
 
         let mut pwm = cx
             .device
             .TIM2
-            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch2, &mut afio.mapr, config::PCLK1, &clocks)
+            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch3, &mut afio.mapr, config::PCLK1, &clocks)
             .split();
         pwm.enable();
         pwm.set_duty(pwm.get_max_duty() / 2);
@@ -100,14 +137,14 @@ mod app {
 
         defmt::info!("Configuring debug indicator LED...");
 
-        let led = gpioc
+        let led: pins::C13_DEBUG_LED = gpioc
             .pc13
             .into_push_pull_output_with_state(&mut gpioc.crh, PinState::High);
 
         defmt::info!("Starting ADC DMA transfer...");
 
         let adc_dma_buf =
-            singleton!(: [[u16; config::ADC_BUF_LEN]; 2] = [[0; config::ADC_BUF_LEN]; 2]).unwrap();
+            singleton!(: [[u16; config::ADC_BUF_LEN_PER_CHANNEL * 2]; 2] = [[0; config::ADC_BUF_LEN_PER_CHANNEL * 2]; 2]).unwrap();
         let fft_buf = singleton!(: [i16; config::FFT_BUF_LEN] = [0; config::FFT_BUF_LEN]).unwrap();
 
         let adc_dma_transfer = adc_dma.circ_read(adc_dma_buf);

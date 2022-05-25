@@ -21,6 +21,7 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "dwt-systick-monotonic",
+ "embedded-hal",
  "fixed",
  "fugit",
  "num-complex",
