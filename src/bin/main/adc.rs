@@ -15,16 +15,13 @@ pub fn process_buffer(
     let values: &mut [i16; config::ADC_BUF_LEN_PER_CHANNEL] = values.try_into().unwrap();
 
     // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
-    values
-        .iter_mut()
-        .zip(input.chunks_exact(2))
-        .for_each(|(value, channels)| {
-            // subtracting the two signals naturally cancels out the Vcc/2 offset
-            let difference = channels[1] as i32 - channels[0] as i32;
-            debug_assert!(difference >= i16::MIN as i32);
-            debug_assert!(difference <= i16::MAX as i32);
-            *value = difference as i16;
-        });
+    for (value, channels) in values.iter_mut().zip(input.chunks_exact(2)) {
+        // subtracting the two channels cancels out the common Vcc/2 offset
+        let difference = i32::from(channels[1]) - i32::from(channels[0]);
+        debug_assert!(difference >= i32::from(i16::MIN));
+        debug_assert!(difference <= i32::from(i16::MAX));
+        *value = difference as i16;
+    }
 
     // zero remaining buffer (to get up to power-of-2)
     // apparently you can pad your sample with zeroes and this increases frequency resolution?
