@@ -8,11 +8,11 @@ mod window;
 
 #[inline(never)]
 pub fn process_buffer(
-    input: &[u16; config::ADC_BUF_LEN_PER_CHANNEL * 2],
-    scratch: &mut [i16; config::FFT_BUF_LEN],
+    input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
+    scratch: &mut [i16; config::fft::BUF_LEN],
 ) {
-    let (values, padding) = scratch.split_at_mut(config::ADC_BUF_LEN_PER_CHANNEL);
-    let values: &mut [i16; config::ADC_BUF_LEN_PER_CHANNEL] = values.try_into().unwrap();
+    let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
+    let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] = values.try_into().unwrap();
 
     // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
     for (value, channels) in values.iter_mut().zip(input.chunks_exact(2)) {
@@ -29,10 +29,11 @@ pub fn process_buffer(
     padding.fill(0);
 
     // apply window function
-    match config::FFT_WINDOW {
-        config::Window::Rectangle => window::rectangle(values),
-        config::Window::BlackmanHarris => window::blackman_harris(values),
-    }
+    let window_fn = match config::fft::WINDOW {
+        config::fft::Window::Rectangle => window::rectangle,
+        config::fft::Window::BlackmanHarris => window::blackman_harris,
+    };
+    window_fn(values);
 
     // run fft
     let data = complex_from_adjacent_values(scratch);
@@ -42,15 +43,19 @@ pub fn process_buffer(
 }
 
 fn complex_from_adjacent_values<T>(
-    x: &mut [T; config::FFT_BUF_LEN],
-) -> &mut [Complex<T>; config::FFT_BUF_LEN / 2] {
+    x: &mut [T; config::fft::BUF_LEN],
+) -> &mut [Complex<T>; config::fft::BUF_LEN / 2] {
     assert!(x.len() % 2 == 0);
     // Safety: Complex<T> is layout-compatible with [T; 2]
     unsafe { mem::transmute(x) }
 }
 
 #[inline(never)]
-fn log_fft_stats(data: &mut [Complex<i16>; config::FFT_BUF_LEN / 2]) {
+fn log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN / 2]) {
+    if !config::debug::LOG_FFT_STATS {
+        return;
+    }
+
     let mut max_amplitude_squared = 0;
     let mut i_at_max = 0;
     let mut val_at_max = Complex::new(0, 0);
@@ -66,7 +71,7 @@ fn log_fft_stats(data: &mut [Complex<i16>; config::FFT_BUF_LEN / 2]) {
     }
 
     let max_amplitude = sqrt(max_amplitude_squared);
-    let freq_at_max = i_at_max * config::FFT_FREQ_RESOLUTION_X1000 / 1000;
+    let freq_at_max = i_at_max * config::fft::FREQ_RESOLUTION_X1000 / 1000;
     let phase_at_max = phase(val_at_max);
     let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
 

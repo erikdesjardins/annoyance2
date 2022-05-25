@@ -23,7 +23,7 @@ mod app {
     use stm32f1xx_hal::timer::Tim2NoRemap;
 
     #[monotonic(binds = SysTick, default = true)]
-    type DwtMono = DwtSystick<{ config::SYSCLK_HZ }>;
+    type DwtMono = DwtSystick<{ config::clk::SYSCLK_HZ }>;
 
     #[allow(non_camel_case_types)]
     mod pins {
@@ -50,7 +50,7 @@ mod app {
     impl SetChannels<AdcPins> for Adc<ADC1> {
         fn set_samples(&mut self) {
             for channel in AdcPins::channels() {
-                self.set_channel_sample_time(channel, config::ADC_SAMPLE);
+                self.set_channel_sample_time(channel, config::adc::SAMPLE);
             }
         }
         fn set_sequence(&mut self) {
@@ -65,10 +65,10 @@ mod app {
     #[local]
     struct Local {
         adc_dma_transfer: CircBuffer<
-            [u16; config::ADC_BUF_LEN_PER_CHANNEL * 2],
+            [u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
             AdcDma<ADC1, AdcPins, Scan, dma1::C1>,
         >,
-        fft_buf: &'static mut [i16; config::FFT_BUF_LEN],
+        fft_buf: &'static mut [i16; config::fft::BUF_LEN],
         debug_led: pins::C13_DEBUG_LED,
     }
 
@@ -87,17 +87,17 @@ mod app {
 
         let clocks = rcc
             .cfgr
-            .use_hse(config::HSE_FREQ)
-            .sysclk(config::SYSCLK)
-            .pclk1(config::PCLK1)
-            .pclk2(config::PCLK2)
-            .adcclk(config::ADCCLK)
+            .use_hse(config::clk::HSE_FREQ)
+            .sysclk(config::clk::SYSCLK)
+            .pclk1(config::clk::PCLK1)
+            .pclk2(config::clk::PCLK2)
+            .adcclk(config::clk::ADCCLK)
             .freeze(&mut flash.acr);
 
-        assert!(config::SYSCLK == clocks.sysclk());
-        assert!(config::PCLK1 == clocks.pclk1());
-        assert!(config::PCLK2 == clocks.pclk2());
-        assert!(config::ADCCLK == clocks.adcclk());
+        assert!(config::clk::SYSCLK == clocks.sysclk());
+        assert!(config::clk::PCLK1 == clocks.pclk1());
+        assert!(config::clk::PCLK2 == clocks.pclk2());
+        assert!(config::clk::ADCCLK == clocks.adcclk());
 
         defmt::info!("Configuring ADC DMA transfer...");
 
@@ -107,7 +107,7 @@ mod app {
         dma1_ch1.listen(Event::TransferComplete);
 
         let mut adc1 = Adc::adc1(cx.device.ADC1, clocks);
-        adc1.set_sample_time(config::ADC_SAMPLE);
+        adc1.set_sample_time(config::adc::SAMPLE);
 
         let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
         let adc_ch1: pins::A1_ADC1C1 = gpioa.pa1.into_analog(&mut gpioa.crl);
@@ -121,7 +121,7 @@ mod app {
         let mut pwm = cx
             .device
             .TIM2
-            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch3, &mut afio.mapr, config::PCLK1, &clocks)
+            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch3, &mut afio.mapr, config::clk::PCLK1, &clocks)
             .split();
         pwm.enable();
         pwm.set_duty(pwm.get_max_duty() / 2);
@@ -144,8 +144,9 @@ mod app {
         defmt::info!("Starting ADC DMA transfer...");
 
         let adc_dma_buf =
-            singleton!(: [[u16; config::ADC_BUF_LEN_PER_CHANNEL * 2]; 2] = [[0; config::ADC_BUF_LEN_PER_CHANNEL * 2]; 2]).unwrap();
-        let fft_buf = singleton!(: [i16; config::FFT_BUF_LEN] = [0; config::FFT_BUF_LEN]).unwrap();
+            singleton!(: [[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2] = [[0; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2]).unwrap();
+        let fft_buf =
+            singleton!(: [i16; config::fft::BUF_LEN] = [0; config::fft::BUF_LEN]).unwrap();
 
         let adc_dma_transfer = adc_dma.circ_read(adc_dma_buf);
 

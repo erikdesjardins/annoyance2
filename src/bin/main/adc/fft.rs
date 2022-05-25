@@ -6,8 +6,8 @@ use num_complex::Complex;
 // - NXP application note: https://www.nxp.com/docs/en/application-note/AN2114.pdf
 // - fix_fft.c: https://gist.github.com/Tomwi/3842231
 
-const N: usize = config::FFT_BUF_LEN / 2;
-const N_LOG2: usize = config::FFT_BUF_LEN_LOG2 - 1;
+const N: usize = config::fft::BUF_LEN / 2;
+const N_LOG2: usize = config::fft::BUF_LEN_LOG2 - 1;
 
 const _: () = assert!(N.is_power_of_two());
 
