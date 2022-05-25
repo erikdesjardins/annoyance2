@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 #![allow(clippy::type_complexity, clippy::needless_range_loop)]
+#![warn(clippy::cast_lossless)]
 
 use annoyance2 as _; // global logger + panicking-behavior + memory layout
 

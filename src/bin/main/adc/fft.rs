@@ -81,17 +81,17 @@ pub fn radix2(pfs: &mut [Complex<i16>; N]) {
                 pfs[pb + j] = ft1b;
                 // cmul
                 let tmp =
-                    (ft2a.re as i32 * PFW[iw].re as i32) - (ft2a.im as i32 * PFW[iw].im as i32);
+                    (i32::from(ft2a.re) * i32::from(PFW[iw].re)) - (i32::from(ft2a.im) * i32::from(PFW[iw].im));
                 pfs[qa + j].re = (tmp >> 15) as i16;
                 let tmp =
-                    (ft2a.re as i32 * PFW[iw].im as i32) + (ft2a.im as i32 * PFW[iw].re as i32);
+                    (i32::from(ft2a.re) * i32::from(PFW[iw].im)) + (i32::from(ft2a.im) * i32::from(PFW[iw].re));
                 pfs[qa + j].im = (tmp >> 15) as i16;
                 // twiddled cmul
                 let tmp =
-                    (ft2b.re as i32 * PFW[iw].im as i32) + (ft2b.im as i32 * PFW[iw].re as i32);
+                    (i32::from(ft2b.re) * i32::from(PFW[iw].im)) + (i32::from(ft2b.im) * i32::from(PFW[iw].re));
                 pfs[qb + j].re = (tmp >> 15) as i16;
                 let tmp =
-                    (-ft2b.re as i32 * PFW[iw].re as i32) + (ft2b.im as i32 * PFW[iw].im as i32);
+                    (i32::from(-ft2b.re) * i32::from(PFW[iw].re)) + (i32::from(ft2b.im) * i32::from(PFW[iw].im));
                 pfs[qb + j].im = (tmp >> 15) as i16;
             }
         }

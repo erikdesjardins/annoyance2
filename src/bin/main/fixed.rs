@@ -10,8 +10,8 @@ use num_complex::Complex;
 /// comparing squared amplitudes is equivalent, and more efficient,
 /// since it avoids a `sqrt` to compute the true amplitude.
 pub fn amplitude_squared(x: Complex<i16>) -> u32 {
-    let re_2 = (x.re as i32).pow(2) as u32;
-    let im_2 = (x.im as i32).pow(2) as u32;
+    let re_2 = i32::from(x.re).pow(2) as u32;
+    let im_2 = i32::from(x.im).pow(2) as u32;
     re_2 + im_2
 }
 
@@ -42,5 +42,5 @@ pub fn sqrt(x: u32) -> u64 {
 
 /// Fixed point scaling.
 pub fn scale_by(x: i16, scale_factor: u16 /* u16::MAX ~ 1.0 */) -> i16 {
-    ((x as i32 * scale_factor as i32) >> 16) as i16
+    ((i32::from(x) * i32::from(scale_factor)) >> 16) as i16
 }
