@@ -37,6 +37,8 @@ pub fn process_buffer(
     // apply window function
     let window_fn = match config::fft::WINDOW {
         config::fft::Window::Rectangle => window::rectangle,
+        config::fft::Window::Hamming => window::hamming,
+        config::fft::Window::BlackmanNutall => window::blackman_nutall,
         config::fft::Window::BlackmanHarris => window::blackman_harris,
     };
     window_fn(values);

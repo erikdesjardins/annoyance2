@@ -100,6 +100,8 @@ pub mod fft {
     #[allow(dead_code)]
     pub enum Window {
         Rectangle,
+        Hamming,
+        BlackmanNutall,
         BlackmanHarris,
     }
 
