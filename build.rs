@@ -38,7 +38,7 @@ fn gen_sin_table(out_dir: &Path) {
 }
 
 fn gen_blackman_harris(out_dir: &Path) {
-    const LEN: usize = 1266;
+    const LEN: usize = 1302;
 
     let table = {
         let mut table = [0; LEN];
