@@ -7,7 +7,7 @@ pub fn rectangle(_data: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL]) {
 }
 
 // put in RAM: ~100us improvement
-#[link_section = ".data.adc::window::BLACKMAN_HARRIS"]
+// #[link_section = ".data.adc::window::BLACKMAN_HARRIS"]
 static BLACKMAN_HARRIS: [u16; config::adc::BUF_LEN_PER_CHANNEL] =
     include!(concat!(env!("OUT_DIR"), "/blackman_harris.rs"));
 

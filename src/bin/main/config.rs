@@ -106,8 +106,9 @@ pub mod fft {
     /// Window type for filtering FFT input
     pub const WINDOW: Window = Window::BlackmanHarris;
 
-    /// Scale up ADC buffer to next power of 2, since that's required for Radix-2 algorithm
-    pub const BUF_LEN_REAL: usize = config::adc::BUF_LEN_PER_CHANNEL.next_power_of_two();
+    /// FFT buffer size should be as large as possible for higher resolution (~20Hz in this case)
+    pub const BUF_LEN_REAL: usize = 4096;
+    const _: () = assert!(BUF_LEN_REAL.is_power_of_two());
     /// Complex ADC buffer is half the size, since each `Complex<i16>` holds two samples
     pub const BUF_LEN_COMPLEX: usize = BUF_LEN_REAL / 2;
 

@@ -12,7 +12,7 @@ const _: () = assert!(N.is_power_of_two());
 
 /// Twiddle factors, used in the Radix-2 FFT algorithm.
 // put in RAM: ~300us improvement
-#[link_section = ".data.adc::fft::PFW"]
+// #[link_section = ".data.adc::fft::PFW"]
 static PFW: [Complex<i16>; N / 4] = {
     const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/sin_table.rs"));
 

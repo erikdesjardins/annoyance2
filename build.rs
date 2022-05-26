@@ -15,7 +15,7 @@ fn main() {
 }
 
 fn gen_sin_table(out_dir: &Path) {
-    const LEN: usize = 1024;
+    const LEN: usize = 2048;
 
     let table = {
         let mut table = [0; LEN];
