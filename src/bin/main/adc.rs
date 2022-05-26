@@ -12,8 +12,6 @@ pub fn process_buffer(
     input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
     scratch: &mut [i16; config::fft::BUF_LEN_REAL],
 ) {
-    debug_log_final_samples(input);
-
     let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
     let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] =
         values.try_into().unwrap_infallible();
@@ -56,15 +54,6 @@ fn complex_from_adjacent_values<T>(
     const _: () = assert!(config::fft::BUF_LEN_REAL == 2 * config::fft::BUF_LEN_COMPLEX);
     // Safety: Complex<T> is layout-compatible with [T; 2]
     unsafe { mem::transmute(x) }
-}
-
-#[inline(never)]
-fn debug_log_final_samples(input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]) {
-    if !config::debug::LOG_FINAL_ADC_SAMPLES {
-        return;
-    }
-
-    defmt::info!("Final samples: {}", &input[input.len() - 4..]);
 }
 
 #[inline(never)]

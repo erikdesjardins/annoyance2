@@ -1,7 +1,5 @@
 /// Debugging flags
 pub mod debug {
-    pub const LOG_FINAL_ADC_SAMPLES: bool = true;
-
     pub const LOG_FFT_STATS: bool = true;
 }
 
