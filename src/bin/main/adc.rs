@@ -12,6 +12,8 @@ pub fn process_buffer(
     input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
     scratch: &mut [i16; config::fft::BUF_LEN],
 ) {
+    debug_log_final_samples(input);
+
     let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
     let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] =
         values.try_into().unwrap_infallible();
@@ -43,7 +45,7 @@ pub fn process_buffer(
     let data = complex_from_adjacent_values(scratch);
     fft::radix2(data);
 
-    log_fft_stats(data);
+    debug_log_fft_stats(data);
 }
 
 fn complex_from_adjacent_values<T>(
@@ -55,7 +57,16 @@ fn complex_from_adjacent_values<T>(
 }
 
 #[inline(never)]
-fn log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN / 2]) {
+fn debug_log_final_samples(input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]) {
+    if !config::debug::LOG_FINAL_ADC_SAMPLES {
+        return;
+    }
+
+    defmt::info!("Final samples: {}", &input[input.len() - 4..]);
+}
+
+#[inline(never)]
+fn debug_log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN / 2]) {
     if !config::debug::LOG_FFT_STATS {
         return;
     }
