@@ -10,8 +10,8 @@ use num_complex::Complex;
 /// comparing squared amplitudes is equivalent, and more efficient,
 /// since it avoids a `sqrt` to compute the true amplitude.
 pub fn amplitude_squared(x: Complex<i16>) -> u32 {
-    let re_2 = i32::from(x.re).pow(2) as u32;
-    let im_2 = i32::from(x.im).pow(2) as u32;
+    let re_2: u32 = i32::from(x.re).pow(2).try_into().unwrap();
+    let im_2: u32 = i32::from(x.im).pow(2).try_into().unwrap();
     re_2 + im_2
 }
 
@@ -28,7 +28,11 @@ pub fn phase(x: Complex<i16>) -> u32 {
     // convert from 0..2pi to 0..1
     let angle = angle / I32F32::PI / I32F32::from_num(2);
     // extract fractional bits
-    angle.to_bits() as u32
+    let full_bits: i64 = angle.to_bits();
+    let positive_bits: u64 = full_bits.try_into().unwrap();
+    debug_assert!(positive_bits <= u64::from(u32::MAX));
+    let fractional_bits: u32 = positive_bits.try_into().unwrap_or(u32::MAX);
+    fractional_bits
 }
 
 /// Fixed point square root.

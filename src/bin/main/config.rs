@@ -109,6 +109,6 @@ pub mod fft {
     pub const BUF_LEN_LOG2: usize = usize::BITS as usize - 1 - BUF_LEN.leading_zeros() as usize;
 
     /// Each FFT bin is this many Hz apart
-    pub const FREQ_RESOLUTION_X1000: u32 =
-        config::adc::SAMPLES_PER_SEC_PER_CHANNEL * 1000 / BUF_LEN as u32;
+    pub const FREQ_RESOLUTION_X1000: usize =
+        config::adc::SAMPLES_PER_SEC_PER_CHANNEL as usize * 1000 / BUF_LEN;
 }

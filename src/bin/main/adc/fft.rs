@@ -39,6 +39,7 @@ static PFW: [Complex<i16>; N / 4] = {
 /// - index N/2 to N: negative frequencies
 #[inline(never)]
 #[rustfmt::skip]
+#[allow(clippy::cast_possible_truncation)]
 pub fn radix2(pfs: &mut [Complex<i16>; N]) {
     for stage in 0..N_LOG2 {
         let stride = N >> (1 + stage);

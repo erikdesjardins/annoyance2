@@ -18,9 +18,11 @@ pub fn process_buffer(
     for (value, channels) in values.iter_mut().zip(input.chunks_exact(2)) {
         // subtracting the two channels cancels out the common Vcc/2 offset
         let difference = i32::from(channels[1]) - i32::from(channels[0]);
-        debug_assert!(difference >= i32::from(i16::MIN));
-        debug_assert!(difference <= i32::from(i16::MAX));
-        *value = difference as i16;
+        // saturate for differences that can't fit into i16 (can overflow by up to 1 bit)
+        // as an alternative to this, we could shift out one bit, but that would lose resolution
+        *value = difference
+            .try_into()
+            .unwrap_or(if difference < 0 { i16::MIN } else { i16::MAX });
     }
 
     // zero remaining buffer (to get up to power-of-2)
@@ -65,7 +67,7 @@ fn log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN / 2]) {
         let amplitude_squared = amplitude_squared(data[i]);
         if amplitude_squared > max_amplitude_squared {
             max_amplitude_squared = amplitude_squared;
-            i_at_max = i as u32;
+            i_at_max = i;
             val_at_max = data[i];
         }
     }
