@@ -1,5 +1,6 @@
 use crate::config;
 use crate::fixed::{amplitude_squared, phase, scale_by, sqrt};
+use crate::panic::OptionalExt;
 use core::mem;
 use num_complex::Complex;
 
@@ -12,7 +13,8 @@ pub fn process_buffer(
     scratch: &mut [i16; config::fft::BUF_LEN],
 ) {
     let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
-    let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] = values.try_into().unwrap();
+    let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] =
+        values.try_into().unwrap_infallible();
 
     // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
     for (value, channels) in values.iter_mut().zip(input.chunks_exact(2)) {
@@ -47,7 +49,7 @@ pub fn process_buffer(
 fn complex_from_adjacent_values<T>(
     x: &mut [T; config::fft::BUF_LEN],
 ) -> &mut [Complex<T>; config::fft::BUF_LEN / 2] {
-    assert!(x.len() % 2 == 0);
+    const _: () = assert!(config::fft::BUF_LEN % 2 == 0);
     // Safety: Complex<T> is layout-compatible with [T; 2]
     unsafe { mem::transmute(x) }
 }

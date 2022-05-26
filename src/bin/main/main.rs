@@ -14,11 +14,12 @@ use annoyance2 as _; // global logger + panicking-behavior + memory layout
 mod adc;
 mod config;
 mod fixed;
+mod panic;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
-
 mod app {
-    use crate::{adc, config};
+    use crate::adc;
+    use crate::config;
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use embedded_hal::adc::Channel;
