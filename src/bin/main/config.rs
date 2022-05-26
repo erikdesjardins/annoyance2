@@ -107,10 +107,11 @@ pub mod fft {
     pub const WINDOW: Window = Window::BlackmanHarris;
 
     /// Scale up ADC buffer to next power of 2, since that's required for Radix-2 algorithm
-    pub const BUF_LEN: usize = config::adc::BUF_LEN_PER_CHANNEL.next_power_of_two();
-    pub const BUF_LEN_LOG2: usize = usize::BITS as usize - 1 - BUF_LEN.leading_zeros() as usize;
+    pub const BUF_LEN_REAL: usize = config::adc::BUF_LEN_PER_CHANNEL.next_power_of_two();
+    /// Complex ADC buffer is half the size, since each `Complex<i16>` holds two samples
+    pub const BUF_LEN_COMPLEX: usize = BUF_LEN_REAL / 2;
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        config::adc::SAMPLES_PER_SEC_PER_CHANNEL as usize * 1000 / BUF_LEN;
+        config::adc::SAMPLES_PER_SEC_PER_CHANNEL as usize * 1000 / BUF_LEN_COMPLEX;
 }

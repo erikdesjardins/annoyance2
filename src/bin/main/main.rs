@@ -76,7 +76,7 @@ mod app {
             [u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
             AdcDma<ADC1, AdcPins, Scan, dma1::C1>,
         >,
-        fft_buf: &'static mut [i16; config::fft::BUF_LEN],
+        fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
         debug_led: pins::C13_DEBUG_LED,
     }
 
@@ -154,7 +154,8 @@ mod app {
         let adc_dma_buf =
             singleton!(: [[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2] = [[0; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2]).unwrap();
         let fft_buf =
-            singleton!(: [i16; config::fft::BUF_LEN] = [0; config::fft::BUF_LEN]).unwrap();
+            singleton!(: [i16; config::fft::BUF_LEN_REAL] = [0; config::fft::BUF_LEN_REAL])
+                .unwrap();
 
         let adc_dma_transfer = adc_dma.circ_read(adc_dma_buf);
 

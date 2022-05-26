@@ -10,7 +10,7 @@ mod window;
 #[inline(never)]
 pub fn process_buffer(
     input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
-    scratch: &mut [i16; config::fft::BUF_LEN],
+    scratch: &mut [i16; config::fft::BUF_LEN_REAL],
 ) {
     debug_log_final_samples(input);
 
@@ -49,9 +49,9 @@ pub fn process_buffer(
 }
 
 fn complex_from_adjacent_values<T>(
-    x: &mut [T; config::fft::BUF_LEN],
-) -> &mut [Complex<T>; config::fft::BUF_LEN / 2] {
-    const _: () = assert!(config::fft::BUF_LEN % 2 == 0);
+    x: &mut [T; config::fft::BUF_LEN_REAL],
+) -> &mut [Complex<T>; config::fft::BUF_LEN_COMPLEX] {
+    const _: () = assert!(config::fft::BUF_LEN_REAL == 2 * config::fft::BUF_LEN_COMPLEX);
     // Safety: Complex<T> is layout-compatible with [T; 2]
     unsafe { mem::transmute(x) }
 }
@@ -66,7 +66,7 @@ fn debug_log_final_samples(input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]) 
 }
 
 #[inline(never)]
-fn debug_log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN / 2]) {
+fn debug_log_fft_stats(data: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
     if !config::debug::LOG_FFT_STATS {
         return;
     }
