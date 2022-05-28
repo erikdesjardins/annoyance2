@@ -18,11 +18,15 @@ fn main() {
 }
 
 fn gen_adc_sin_table(out_dir: &Path) {
-    write_sin_table::<633>(&out_dir.join("adc_sin_table.rs"));
+    const LEN: usize = 633;
+
+    write_sin_table::<LEN>(&out_dir.join("adc_sin_table.rs"));
 }
 
 fn gen_fft_sin_table(out_dir: &Path) {
-    write_sin_table::<2048>(&out_dir.join("fft_sin_table.rs"));
+    const LEN: usize = 2048;
+
+    write_sin_table::<LEN>(&out_dir.join("fft_sin_table.rs"));
 }
 
 fn gen_hamming(out_dir: &Path) {
