@@ -66,13 +66,13 @@ pub mod adc {
     use stm32f1xx_hal::adc::SampleTime;
 
     /// ADC scans two channels for differential input
-    const CHANNELS: u32 = 2;
+    const CHANNELS: usize = 2;
 
     /// ADC averages 1 samples for each data point
-    pub const OVERSAMPLE: u32 = 1;
+    pub const OVERSAMPLE: usize = 1;
 
     /// Sample at ADCCLK / 55.5 = 40540 Hz (~20kHz per channel)
-    const SAMPLE_CYC_X10: u32 = 555;
+    const SAMPLE_CYC_X10: usize = 555;
     pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10 {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
@@ -86,22 +86,32 @@ pub mod adc {
     };
 
     /// Number of raw ADC samples, per second (both channels, oversampled)
-    const RAW_SAMPLES_PER_SEC: u32 = config::clk::ADCCLK.to_Hz() * 10 / SAMPLE_CYC_X10;
+    const RAW_SAMPLES_PER_SEC_X100: usize =
+        100 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
 
-    pub(super) const PROCESSED_SAMPLES_PER_SEC: u32 = RAW_SAMPLES_PER_SEC / CHANNELS / OVERSAMPLE;
+    pub(super) const PROCESSED_SAMPLES_PER_SEC_X100: usize =
+        RAW_SAMPLES_PER_SEC_X100 / CHANNELS / OVERSAMPLE;
 
     /// Swap buffers ~32 times per second
     /// Note that 1/32 notes (semidemiquavers) at 60 bpm are 1/8 second
     const BUFFERS_PER_SEC: usize = 32;
 
     /// Raw, differential, oversampled samples per buffer.
-    pub const BUF_LEN_RAW: usize = RAW_SAMPLES_PER_SEC as usize / BUFFERS_PER_SEC;
+    ///
+    /// Note: this may not result in a perfect number of buffers per second,
+    /// since it is unlikely that the sample rate is evenly divisible.
+    pub const BUF_LEN_RAW: usize = {
+        let approx_len = RAW_SAMPLES_PER_SEC_X100 / BUFFERS_PER_SEC / 100;
+        // make divisible by CHANNELS and OVERSAMPLE so processed buffer fits in perfectly
+        let remainder = approx_len % (CHANNELS * OVERSAMPLE);
+        approx_len - remainder
+    };
 
     /// Processed, single-ended, averaged samples per buffer.
-    pub const BUF_LEN_PROCESSED: usize = BUF_LEN_RAW / CHANNELS as usize / OVERSAMPLE as usize;
+    pub const BUF_LEN_PROCESSED: usize = BUF_LEN_RAW / CHANNELS / OVERSAMPLE;
 
     const _: () = assert!(
-        BUF_LEN_PROCESSED * CHANNELS as usize * OVERSAMPLE as usize == BUF_LEN_RAW,
+        BUF_LEN_PROCESSED * CHANNELS * OVERSAMPLE == BUF_LEN_RAW,
         "processed buf len should perfectly divide raw buf len"
     );
 }
@@ -124,10 +134,12 @@ pub mod fft {
     /// FFT buffer size should be as large as possible for higher resolution (~20Hz in this case)
     pub const BUF_LEN_REAL: usize = 4096;
     const _: () = assert!(BUF_LEN_REAL.is_power_of_two());
+    const _: () = assert!(BUF_LEN_REAL >= config::adc::BUF_LEN_PROCESSED);
+
     /// Complex ADC buffer is half the size, since each `Complex<i16>` holds two samples
     pub const BUF_LEN_COMPLEX: usize = BUF_LEN_REAL / 2;
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        config::adc::PROCESSED_SAMPLES_PER_SEC as usize * 1000 / BUF_LEN_COMPLEX;
+        10 * config::adc::PROCESSED_SAMPLES_PER_SEC_X100 / BUF_LEN_COMPLEX;
 }
