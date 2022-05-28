@@ -50,6 +50,6 @@ pub fn sqrt(x: u32) -> u64 {
 }
 
 /// Fixed point scaling.
-pub fn scale_by(x: i16, scale_factor: u16 /* u16::MAX ~ 1.0 */) -> i16 {
-    ((i32::from(x) * i32::from(scale_factor)) >> 16) as i16
+pub const fn scale_by(x: i16, scale_factor: u16 /* u16::MAX ~ 1.0 */) -> i16 {
+    ((x as i32 * scale_factor as i32) >> 16) as i16
 }

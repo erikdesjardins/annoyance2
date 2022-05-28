@@ -37,7 +37,7 @@ const _: () = assert!(N.is_power_of_two());
 // put in RAM: ~300us improvement
 // #[link_section = ".data.adc::fft::PFW"]
 static PFW: [Complex<i16>; N / 4] = {
-    const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/sin_table.rs"));
+    const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/fft_sin_table.rs"));
 
     let mut twiddle = [Complex::new(0, 0); N / 4];
 

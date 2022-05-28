@@ -1,6 +1,6 @@
 use std::env;
 use std::f64;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 use std::fs;
 use std::path::Path;
 
@@ -8,7 +8,8 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
 
-    gen_sin_table(out_dir);
+    gen_adc_sin_table(out_dir);
+    gen_fft_sin_table(out_dir);
     gen_hamming(out_dir);
     gen_blackman_nutall(out_dir);
     gen_blackman_harris(out_dir);
@@ -16,9 +17,33 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 }
 
-fn gen_sin_table(out_dir: &Path) {
-    const LEN: usize = 2048;
+fn gen_adc_sin_table(out_dir: &Path) {
+    write_sin_table::<633>(&out_dir.join("adc_sin_table.rs"));
+}
 
+fn gen_fft_sin_table(out_dir: &Path) {
+    write_sin_table::<2048>(&out_dir.join("fft_sin_table.rs"));
+}
+
+fn gen_hamming(out_dir: &Path) {
+    write_window_coefficients(&out_dir.join("hamming.rs"), [0.53836, 0.46164, 0., 0.]);
+}
+
+fn gen_blackman_nutall(out_dir: &Path) {
+    write_window_coefficients(
+        &out_dir.join("blackman_nutall.rs"),
+        [0.3635819, 0.4891775, 0.1365995, 0.0106411],
+    );
+}
+
+fn gen_blackman_harris(out_dir: &Path) {
+    write_window_coefficients(
+        &out_dir.join("blackman_harris.rs"),
+        [0.35875, 0.48829, 0.14128, 0.01168],
+    );
+}
+
+fn write_sin_table<const LEN: usize>(file_path: &Path) {
     let table = {
         let mut table = [0; LEN];
         for (i, x) in table.iter_mut().enumerate() {
@@ -29,35 +54,10 @@ fn gen_sin_table(out_dir: &Path) {
         table
     };
 
-    let mut out = String::new();
-    writeln!(out, "[").unwrap();
-    for x in table {
-        writeln!(out, "    {},", x).unwrap();
-    }
-    writeln!(out, "]").unwrap();
-
-    fs::write(out_dir.join("sin_table.rs"), out).unwrap();
+    write_table(file_path, &table)
 }
 
-fn gen_hamming(out_dir: &Path) {
-    gen_window_coefficients(&out_dir.join("hamming.rs"), [0.53836, 0.46164, 0., 0.]);
-}
-
-fn gen_blackman_nutall(out_dir: &Path) {
-    gen_window_coefficients(
-        &out_dir.join("blackman_nutall.rs"),
-        [0.3635819, 0.4891775, 0.1365995, 0.0106411],
-    );
-}
-
-fn gen_blackman_harris(out_dir: &Path) {
-    gen_window_coefficients(
-        &out_dir.join("blackman_harris.rs"),
-        [0.35875, 0.48829, 0.14128, 0.01168],
-    );
-}
-
-fn gen_window_coefficients(file_path: &Path, a: [f64; 4]) {
+fn write_window_coefficients(file_path: &Path, a: [f64; 4]) {
     const LEN: usize = 633;
 
     let table = {
@@ -74,12 +74,39 @@ fn gen_window_coefficients(file_path: &Path, a: [f64; 4]) {
         table
     };
 
+    write_table(file_path, &table);
+}
+
+fn write_table<T>(file_path: &Path, table: &[T])
+where
+    T: Display + NumericSuffix,
+{
     let mut out = String::new();
-    writeln!(out, "[").unwrap();
+
+    out.push('[');
+    let mut first = true;
     for x in table {
-        writeln!(out, "    {},", x).unwrap();
+        write!(out, "{}", x).unwrap();
+        if first {
+            first = false;
+            // add type suffix to first element to ensure we don't accidentally use the wrong type
+            out.push_str(T::SUFFIX);
+        }
+        out.push_str(",\n");
     }
-    writeln!(out, "]").unwrap();
+    out.push(']');
 
     fs::write(file_path, out).unwrap();
+}
+
+trait NumericSuffix {
+    const SUFFIX: &'static str;
+}
+
+impl NumericSuffix for u16 {
+    const SUFFIX: &'static str = "u16";
+}
+
+impl NumericSuffix for i16 {
+    const SUFFIX: &'static str = "i16";
 }

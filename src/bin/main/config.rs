@@ -1,6 +1,10 @@
 /// Debugging flags
 pub mod debug {
-    pub const LOG_FFT_STATS: bool = true;
+    pub const LOG_FFT_STATS: bool = false;
+
+    pub const FAKE_INPUT_DATA: bool = false;
+    pub const FAKE_INPUT_CYCLES_PER_BUF: usize = 8; // frequency = this * BUFFERS_PER_SEC
+    pub const FAKE_INPUT_AMPLITUDE: u16 = u16::MAX / 2;
 }
 
 /// Clock configuration
