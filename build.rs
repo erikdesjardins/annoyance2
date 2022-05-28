@@ -58,7 +58,7 @@ fn gen_blackman_harris(out_dir: &Path) {
 }
 
 fn gen_window_coefficients(file_path: &Path, a: [f64; 4]) {
-    const LEN: usize = 1302;
+    const LEN: usize = 633;
 
     let table = {
         let mut table = [0; LEN];

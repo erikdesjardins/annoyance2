@@ -35,8 +35,8 @@ pub mod clk {
 
     // For adc, want slow enough to sample audio, but fast enough that register writes are acknowledged fast (?)
 
-    /// ADC prescaler @ /8 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(1125);
+    /// ADC prescaler @ /4 (max 14MHz, min 600kHz)
+    pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(2250);
 }
 
 // Prolog for clock config:
@@ -66,8 +66,8 @@ pub mod adc {
     /// ADC scans two channels for differential input
     const CHANNELS: u32 = 2;
 
-    /// Sample at ADCCLK / 13.5 = 83333 Hz (~40kHz per channel)
-    const SAMPLE_CYC_X10: u32 = 135;
+    /// Sample at ADCCLK / 55.5 = 40540 Hz (~20kHz per channel)
+    const SAMPLE_CYC_X10: u32 = 555;
     pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10 {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
