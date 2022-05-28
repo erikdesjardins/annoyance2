@@ -25,9 +25,13 @@ pub fn phase(x: Complex<i16>) -> u32 {
 
     let angle = cordic::atan2(y, x);
     // convert from -pi..pi to 0..2pi
-    let angle = angle + I32F32::PI;
+    let angle = if angle >= 0 {
+        angle
+    } else {
+        angle + 2 * I32F32::PI
+    };
     // convert from 0..2pi to 0..1
-    let angle = angle / I32F32::PI / I32F32::from_num(2);
+    let angle = angle / I32F32::PI / 2;
     // extract fractional bits
     let full_bits: i64 = angle.to_bits();
     let positive_bits: u64 = full_bits.try_into().unwrap();
