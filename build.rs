@@ -24,7 +24,7 @@ fn gen_adc_sin_table(out_dir: &Path) {
 }
 
 fn gen_fft_sin_table(out_dir: &Path) {
-    const LEN: usize = 2048;
+    const LEN: usize = 1024;
 
     write_sin_table::<LEN>(&out_dir.join("fft_sin_table.rs"));
 }

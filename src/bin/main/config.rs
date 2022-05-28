@@ -185,8 +185,8 @@ pub mod fft {
     /// Window type for filtering FFT input
     pub const WINDOW: Window = Window::BlackmanHarris;
 
-    /// FFT buffer size should be as large as possible for higher resolution (~20Hz in this case)
-    pub const BUF_LEN_REAL: usize = 4096;
+    /// FFT buffer size should be as large as possible for higher resolution
+    pub const BUF_LEN_REAL: usize = 2048;
     const _: () = assert!(BUF_LEN_REAL.is_power_of_two());
     const _: () = assert!(BUF_LEN_REAL >= config::adc::BUF_LEN_PROCESSED);
 
