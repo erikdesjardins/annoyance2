@@ -8,12 +8,12 @@ use num_complex::Complex;
 /// Squared amplitude of a complex number.
 ///
 /// Since integer exponentiation / rooting is monotonic,
-/// comparing squared amplitudes is equivalent, and more efficient,
-/// since it avoids a `sqrt` to compute the true amplitude.
+/// comparing squared amplitudes is equivalent to comparing amplitudes,
+/// and is more efficient, since it avoids a `sqrt` to compute the amplitude.
 pub fn amplitude_squared(x: Complex<i16>) -> u32 {
     let re_2: u32 = i32::from(x.re).pow(2).try_into().unwrap_infallible();
     let im_2: u32 = i32::from(x.im).pow(2).try_into().unwrap_infallible();
-    re_2 + im_2
+    re_2.checked_add(im_2).unwrap_infallible()
 }
 
 /// Phase of a complex number.
