@@ -1,6 +1,10 @@
 #![no_main]
 #![no_std]
-#![allow(clippy::type_complexity, clippy::needless_range_loop)]
+#![allow(
+    clippy::assertions_on_constants,
+    clippy::needless_range_loop,
+    clippy::type_complexity
+)]
 #![warn(
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
