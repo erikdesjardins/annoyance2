@@ -1,3 +1,55 @@
+pub fn dump_to_log() {
+    defmt::info!(
+        "\n\
+        Debugging flags:\n\
+        - FAKE_INPUT_DATA: {}\n\
+        - FAKE_INPUT_CYCLES_PER_BUF: {}\n\
+        - FAKE_INPUT_AMPLITUDE: {}\n\
+        Clocks:\n\
+        - HSE_FREQ: {} Hz\n\
+        - SYSCLK:   {} Hz\n\
+        - PCLK1:    {} Hz\n\
+        - PCLK2:    {} Hz\n\
+        - ADCCLK:   {} Hz\n\
+        ADC:\n\
+        - CHANNELS: {}\n\
+        - OVERSAMPLE: {}\n\
+        - SAMPLES_PER_SEC_RAW:       {}.{} (all channels, oversampled)\n\
+        - SAMPLES_PER_SEC_PROCESSED: {}.{} (one channel)\n\
+        - BUFFERS_PER_SEC: {}\n\
+        - BUF_LEN_RAW:       {} (all channels, oversampled)\n\
+        - BUF_LEN_PROCESSED: {} (one channel)\n\
+        FFT:\n\
+        - WINDOW: {}\n\
+        - BUF_LEN_REAL:    {}\n\
+        - BUF_LEN_COMPLEX: {}\n\
+        - FREQ_RESOLUTION: {}.{} Hz\n\
+        ",
+        debug::FAKE_INPUT_DATA,
+        debug::FAKE_INPUT_CYCLES_PER_BUF,
+        debug::FAKE_INPUT_AMPLITUDE,
+        clk::HSE_FREQ.to_Hz(),
+        clk::SYSCLK.to_Hz(),
+        clk::PCLK1.to_Hz(),
+        clk::PCLK2.to_Hz(),
+        clk::ADCCLK.to_Hz(),
+        adc::CHANNELS,
+        adc::OVERSAMPLE,
+        adc::SAMPLES_PER_SEC_RAW_X100 / 100,
+        adc::SAMPLES_PER_SEC_RAW_X100 % 100,
+        adc::SAMPLES_PER_SEC_PROCESSED_X100 / 100,
+        adc::SAMPLES_PER_SEC_PROCESSED_X100 % 100,
+        adc::BUFFERS_PER_SEC,
+        adc::BUF_LEN_RAW,
+        adc::BUF_LEN_PROCESSED,
+        fft::WINDOW,
+        fft::BUF_LEN_REAL,
+        fft::BUF_LEN_COMPLEX,
+        fft::FREQ_RESOLUTION_X1000 / 1000,
+        fft::FREQ_RESOLUTION_X1000 % 1000,
+    );
+}
+
 /// Debugging flags
 pub mod debug {
     pub const FAKE_INPUT_DATA: bool = false;
@@ -66,7 +118,7 @@ pub mod adc {
     use stm32f1xx_hal::adc::SampleTime;
 
     /// ADC scans two channels for differential input
-    const CHANNELS: usize = 2;
+    pub const CHANNELS: usize = 2;
 
     /// ADC averages 1 samples for each data point
     pub const OVERSAMPLE: usize = 1;
@@ -86,22 +138,22 @@ pub mod adc {
     };
 
     /// Number of raw ADC samples, per second (both channels, oversampled)
-    const RAW_SAMPLES_PER_SEC_X100: usize =
+    pub(super) const SAMPLES_PER_SEC_RAW_X100: usize =
         100 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
 
-    pub(super) const PROCESSED_SAMPLES_PER_SEC_X100: usize =
-        RAW_SAMPLES_PER_SEC_X100 / CHANNELS / OVERSAMPLE;
+    pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize =
+        SAMPLES_PER_SEC_RAW_X100 / CHANNELS / OVERSAMPLE;
 
     /// Swap buffers ~32 times per second
     /// Note that 1/32 notes (semidemiquavers) at 60 bpm are 1/8 second
-    const BUFFERS_PER_SEC: usize = 32;
+    pub(super) const BUFFERS_PER_SEC: usize = 32;
 
     /// Raw, differential, oversampled samples per buffer.
     ///
     /// Note: this may not result in a perfect number of buffers per second,
     /// since it is unlikely that the sample rate is evenly divisible.
     pub const BUF_LEN_RAW: usize = {
-        let approx_len = RAW_SAMPLES_PER_SEC_X100 / BUFFERS_PER_SEC / 100;
+        let approx_len = SAMPLES_PER_SEC_RAW_X100 / BUFFERS_PER_SEC / 100;
         // make divisible by CHANNELS and OVERSAMPLE so processed buffer fits in perfectly
         let remainder = approx_len % (CHANNELS * OVERSAMPLE);
         approx_len - remainder
@@ -119,8 +171,10 @@ pub mod adc {
 /// FFT configuration
 pub mod fft {
     use crate::config;
+    use defmt::Format;
 
     #[allow(dead_code)]
+    #[derive(Format)]
     pub enum Window {
         Rectangle,
         Hamming,
@@ -141,5 +195,5 @@ pub mod fft {
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        10 * config::adc::PROCESSED_SAMPLES_PER_SEC_X100 / BUF_LEN_COMPLEX;
+        10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_COMPLEX;
 }

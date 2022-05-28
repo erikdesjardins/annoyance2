@@ -89,6 +89,10 @@ mod app {
 
     #[init]
     fn init(mut cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        defmt::info!("Dumping config...");
+
+        config::dump_to_log();
+
         defmt::info!("Starting init...");
 
         let mut afio = cx.device.AFIO.constrain();
