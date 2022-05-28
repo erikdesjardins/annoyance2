@@ -1,10 +1,33 @@
 use crate::config;
+use crate::fixed::{amplitude_squared, phase, scale_by, sqrt};
+use core::mem;
 use num_complex::Complex;
 
 // Fixed point FFT
 // Based on:
 // - NXP application note: https://www.nxp.com/docs/en/application-note/AN2114.pdf
 // - fix_fft.c: https://gist.github.com/Tomwi/3842231
+
+/// Run in-place Radix-2 FFT.
+///
+/// Results are as follows:
+/// - index 0 to N/2: positive frequencies, with DC at 0 and Nyquist frequency at N/2
+/// - index N/2 to N: negative frequencies
+pub fn run(
+    samples: &mut [i16; config::fft::BUF_LEN_REAL],
+) -> &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX] {
+    let bins = complex_from_adjacent_values(samples);
+    radix2(bins);
+    bins
+}
+
+fn complex_from_adjacent_values<T>(
+    x: &mut [T; config::fft::BUF_LEN_REAL],
+) -> &mut [Complex<T>; config::fft::BUF_LEN_COMPLEX] {
+    const _: () = assert!(config::fft::BUF_LEN_REAL == 2 * config::fft::BUF_LEN_COMPLEX);
+    // Safety: Complex<T> is layout-compatible with [T; 2]
+    unsafe { mem::transmute(x) }
+}
 
 const N: usize = config::fft::BUF_LEN_COMPLEX;
 const N_LOG2: usize = usize::BITS as usize - 1 - N.leading_zeros() as usize;
@@ -31,15 +54,10 @@ static PFW: [Complex<i16>; N / 4] = {
     twiddle
 };
 
-/// Run in-place Radix-2 FFT.
-///
-/// Results are as follows:
-/// - index 0 to N/2: positive frequencies, with DC at 0 and Nyquist frequency at N/2
-/// - index N/2 to N: negative frequencies
 #[inline(never)]
 #[rustfmt::skip]
 #[allow(clippy::cast_possible_truncation)]
-pub fn radix2(pfs: &mut [Complex<i16>; N]) {
+fn radix2(pfs: &mut [Complex<i16>; N]) {
     for stage in 0..N_LOG2 {
         let stride = N >> (1 + stage);
         let edirts = 1 << stage;
@@ -93,4 +111,39 @@ pub fn radix2(pfs: &mut [Complex<i16>; N]) {
             }
         }
     }
+}
+
+#[inline(never)]
+pub fn debug_log_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
+    if !config::debug::LOG_FFT_STATS {
+        return;
+    }
+
+    let mut max_amplitude_squared = 0;
+    let mut i_at_max = 0;
+    let mut val_at_max = Complex::new(0, 0);
+
+    // only look at positive, non-DC frequencies in first half of array
+    for i in 2..bins.len() / 2 {
+        let amplitude_squared = amplitude_squared(bins[i]);
+        if amplitude_squared > max_amplitude_squared {
+            max_amplitude_squared = amplitude_squared;
+            i_at_max = i;
+            val_at_max = bins[i];
+        }
+    }
+
+    let max_amplitude = sqrt(max_amplitude_squared);
+    let freq_at_max = i_at_max * config::fft::FREQ_RESOLUTION_X1000 / 1000;
+    let phase_at_max = phase(val_at_max);
+    let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
+
+    defmt::info!(
+        "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles (~{} deg)",
+        max_amplitude,
+        freq_at_max,
+        phase_at_max,
+        u32::MAX,
+        deg_at_max,
+    );
 }

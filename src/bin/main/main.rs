@@ -17,13 +17,18 @@ use annoyance2 as _; // global logger + panicking-behavior + memory layout
 
 mod adc;
 mod config;
+mod fft;
 mod fixed;
 mod panic;
+mod window;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
 mod app {
     use crate::adc;
     use crate::config;
+    use crate::fft;
+    use crate::panic::OptionalExt;
+    use crate::window;
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use embedded_hal::adc::Channel;
@@ -200,10 +205,26 @@ mod app {
         let start = monotonics::now();
         cx.local.debug_led.set_low();
 
-        let res = cx
-            .local
-            .adc_dma_transfer
-            .peek(|half, _| adc::process_buffer(half, cx.local.fft_buf));
+        let res = cx.local.adc_dma_transfer.peek(|samples, _| {
+            let scratch = cx.local.fft_buf;
+
+            let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
+            let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] =
+                values.try_into().unwrap_infallible();
+
+            // populate values and padding in FFT scratch buffer
+            adc::differential_to_single_ended(samples, values);
+            padding.fill(0);
+
+            // apply window function to data
+            window::apply_to(values);
+
+            // run fft
+            let bins = fft::run(scratch);
+
+            // debug logging
+            fft::debug_log_stats(bins);
+        });
 
         cx.local.debug_led.set_high();
         let duration = monotonics::now() - start;
