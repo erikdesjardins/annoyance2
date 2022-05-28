@@ -138,7 +138,7 @@ pub fn debug_log_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) 
     let phase_at_max = phase(val_at_max);
     let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
 
-    defmt::info!(
+    defmt::println!(
         "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles (~{} deg)",
         max_amplitude,
         freq_at_max,

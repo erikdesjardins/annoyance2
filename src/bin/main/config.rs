@@ -1,5 +1,7 @@
 /// Debugging flags
 pub mod debug {
+    pub const LOG_TIMING: bool = false;
+
     pub const LOG_FFT_STATS: bool = false;
 
     pub const FAKE_INPUT_DATA: bool = false;
