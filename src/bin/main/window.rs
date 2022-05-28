@@ -3,17 +3,17 @@ use crate::fixed::scale_by;
 
 // put in RAM: ~100us improvement
 // #[link_section = ".data.adc::window::HAMMING"]
-static HAMMING: [u16; config::adc::BUF_LEN_PER_CHANNEL] =
+static HAMMING: [u16; config::adc::BUF_LEN_PROCESSED] =
     include!(concat!(env!("OUT_DIR"), "/hamming.rs"));
 
-static BLACKMAN_NUTALL: [u16; config::adc::BUF_LEN_PER_CHANNEL] =
+static BLACKMAN_NUTALL: [u16; config::adc::BUF_LEN_PROCESSED] =
     include!(concat!(env!("OUT_DIR"), "/blackman_nutall.rs"));
 
-static BLACKMAN_HARRIS: [u16; config::adc::BUF_LEN_PER_CHANNEL] =
+static BLACKMAN_HARRIS: [u16; config::adc::BUF_LEN_PROCESSED] =
     include!(concat!(env!("OUT_DIR"), "/blackman_harris.rs"));
 
 #[inline(never)]
-pub fn apply_to(data: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL]) {
+pub fn apply_to(data: &mut [i16; config::adc::BUF_LEN_PROCESSED]) {
     let window = match config::fft::WINDOW {
         config::fft::Window::Rectangle => {
             // no scaling

@@ -81,10 +81,8 @@ mod app {
 
     #[local]
     struct Local {
-        adc_dma_transfer: CircBuffer<
-            [u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
-            AdcDma<ADC1, AdcPins, Scan, dma1::C1>,
-        >,
+        adc_dma_transfer:
+            CircBuffer<[u16; config::adc::BUF_LEN_RAW], AdcDma<ADC1, AdcPins, Scan, dma1::C1>>,
         fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
         debug_led: pins::C13_DEBUG_LED,
     }
@@ -161,7 +159,8 @@ mod app {
         defmt::info!("Starting ADC DMA transfer...");
 
         let adc_dma_buf =
-            singleton!(: [[u16; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2] = [[0; config::adc::BUF_LEN_PER_CHANNEL * 2]; 2]).unwrap();
+            singleton!(: [[u16; config::adc::BUF_LEN_RAW]; 2] = [[0; config::adc::BUF_LEN_RAW]; 2])
+                .unwrap();
         let fft_buf =
             singleton!(: [i16; config::fft::BUF_LEN_REAL] = [0; config::fft::BUF_LEN_REAL])
                 .unwrap();
@@ -210,12 +209,12 @@ mod app {
         let res = cx.local.adc_dma_transfer.peek(|samples, _| {
             let scratch = cx.local.fft_buf;
 
-            let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PER_CHANNEL);
-            let values: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL] =
+            let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PROCESSED);
+            let values: &mut [i16; config::adc::BUF_LEN_PROCESSED] =
                 values.try_into().unwrap_infallible();
 
             // populate values and padding in FFT scratch buffer
-            adc::differential_to_single_ended(samples, values);
+            adc::process_raw_samples(samples, values);
             padding.fill(0);
 
             // apply window function to data

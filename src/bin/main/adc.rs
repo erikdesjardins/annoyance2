@@ -2,9 +2,9 @@ use crate::config;
 use crate::fixed::scale_by;
 
 #[inline(never)]
-pub fn differential_to_single_ended(
-    input: &[u16; config::adc::BUF_LEN_PER_CHANNEL * 2],
-    output: &mut [i16; config::adc::BUF_LEN_PER_CHANNEL],
+pub fn process_raw_samples(
+    input: &[u16; config::adc::BUF_LEN_RAW],
+    output: &mut [i16; config::adc::BUF_LEN_PROCESSED],
 ) {
     if config::debug::FAKE_INPUT_DATA {
         output.copy_from_slice(&FAKE_SIN_TABLE);
@@ -23,8 +23,8 @@ pub fn differential_to_single_ended(
     }
 }
 
-static FAKE_SIN_TABLE: [i16; config::adc::BUF_LEN_PER_CHANNEL] = {
-    const LEN: usize = config::adc::BUF_LEN_PER_CHANNEL;
+static FAKE_SIN_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
+    const LEN: usize = config::adc::BUF_LEN_PROCESSED;
 
     const SIN_TABLE: [i16; LEN] = include!(concat!(env!("OUT_DIR"), "/adc_sin_table.rs"));
 
