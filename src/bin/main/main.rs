@@ -199,9 +199,7 @@ mod app {
         priority = 1
     )]
     fn adc_dma(cx: adc_dma::Context) {
-        if config::debug::LOG_TIMING {
-            defmt::println!("Started processing ADC buffer...");
-        }
+        defmt::debug!("Started processing ADC buffer...");
 
         let start = monotonics::now();
         cx.local.debug_led.set_low();
@@ -223,28 +221,22 @@ mod app {
             // run fft
             let bins = fft::run(scratch);
 
-            // debug logging
-            fft::debug_log_stats(bins);
+            // find peaks in spectrum
+            fft::compute_stats(bins);
         });
 
         cx.local.debug_led.set_high();
         let duration = monotonics::now() - start;
 
-        if config::debug::LOG_TIMING {
-            match res {
-                Ok(()) => defmt::println!(
-                    "Finished processing ADC buffer after {}us.",
-                    duration.to_micros()
-                ),
-                Err(_) => defmt::println!(
-                    "ADC buffer processing did not complete in time (took {}us).",
-                    duration.to_micros()
-                ),
-            }
-        } else {
-            if res.is_err() {
-                defmt::warn!("ADC buffer processing did not complete in time.");
-            }
+        match res {
+            Ok(()) => defmt::debug!(
+                "Finished processing ADC buffer after {}us.",
+                duration.to_micros()
+            ),
+            Err(_) => defmt::warn!(
+                "ADC buffer processing did not complete in time (took {}us).",
+                duration.to_micros()
+            ),
         }
     }
 }

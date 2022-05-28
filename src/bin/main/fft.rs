@@ -114,11 +114,7 @@ fn radix2(pfs: &mut [Complex<i16>; N]) {
 }
 
 #[inline(never)]
-pub fn debug_log_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
-    if !config::debug::LOG_FFT_STATS {
-        return;
-    }
-
+pub fn compute_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
     let mut max_amplitude_squared = 0;
     let mut i_at_max = 0;
     let mut val_at_max = Complex::new(0, 0);
@@ -138,7 +134,7 @@ pub fn debug_log_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) 
     let phase_at_max = phase(val_at_max);
     let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
 
-    defmt::println!(
+    defmt::info!(
         "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles (~{} deg)",
         max_amplitude,
         freq_at_max,
