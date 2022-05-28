@@ -6,20 +6,45 @@ pub fn process_raw_samples(
     input: &[u16; config::adc::BUF_LEN_RAW],
     output: &mut [i16; config::adc::BUF_LEN_PROCESSED],
 ) {
-    if config::debug::FAKE_INPUT_DATA {
-        output.copy_from_slice(&FAKE_SIN_TABLE);
-        return;
+    // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
+    assert_eq!(output.len() * 2 * config::adc::OVERSAMPLE, input.len());
+
+    for (value, samples) in output
+        .iter_mut()
+        .zip(input.chunks_exact(2 * config::adc::OVERSAMPLE))
+    {
+        // sum up oversampled channels
+        let mut channel_a: i32 = 0;
+        let mut channel_b: i32 = 0;
+        for channels in samples.chunks_exact(2) {
+            channel_a += i32::from(channels[0]);
+            channel_b += i32::from(channels[1]);
+        }
+        // subtract groups of samples
+        let difference = channel_b - channel_a;
+        // scale down difference by oversample ratio
+        let difference = difference / config::adc::OVERSAMPLE as i32;
+        // truncate difference
+        let difference: i16 = difference.try_into().unwrap_or_else(|_| {
+            if cfg!(debug_assertions) {
+                panic!("overflow in difference truncation: {}", difference);
+            } else {
+                0
+            }
+        });
+        *value = difference;
     }
 
-    // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
-    for (value, channels) in output.iter_mut().zip(input.chunks_exact(2)) {
-        // subtracting the two channels cancels out the common Vcc/2 offset
-        let difference = i32::from(channels[1]) - i32::from(channels[0]);
-        // saturate for differences that can't fit into i16 (can overflow by up to 1 bit)
-        // as an alternative to this, we could shift out one bit, but that would lose resolution
-        *value = difference
-            .try_into()
-            .unwrap_or(if difference < 0 { i16::MIN } else { i16::MAX });
+    if config::debug::FAKE_INPUT_DATA {
+        output.copy_from_slice(&FAKE_SIN_TABLE);
+    }
+
+    if config::debug::LOG_LAST_FEW_SAMPLES {
+        defmt::println!(
+            "ADC samples (last {}): {}",
+            config::debug::LOG_LAST_N_SAMPLES,
+            output[output.len() - config::debug::LOG_LAST_N_SAMPLES..]
+        );
     }
 }
 

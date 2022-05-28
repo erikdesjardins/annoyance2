@@ -12,7 +12,7 @@ use num_complex::Complex;
 ///
 /// Results are as follows:
 /// - index 0 to N/2: positive frequencies, with DC at 0 and Nyquist frequency at N/2
-/// - index N/2 to N: negative frequencies
+/// - index N/2 to N: negative frequencies (generally can be ignored)
 pub fn run(
     samples: &mut [i16; config::fft::BUF_LEN_REAL],
 ) -> &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX] {
@@ -142,4 +142,18 @@ pub fn compute_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
         u32::MAX,
         deg_at_max,
     );
+
+    if config::debug::LOG_ALL_FFT_AMPLITUDES {
+        let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX / 2];
+        for (amp, bin) in amplitudes.iter_mut().zip(bins) {
+            *amp = (sqrt(amplitude_squared(*bin)) >> 32) as u16;
+        }
+        defmt::println!(
+            "FFT ({}.{} Hz per each of {} buckets): {}",
+            config::fft::FREQ_RESOLUTION_X1000 / 1000,
+            config::fft::FREQ_RESOLUTION_X1000 % 1000,
+            amplitudes.len(),
+            amplitudes
+        );
+    }
 }

@@ -2,9 +2,12 @@ pub fn dump_to_log() {
     defmt::info!(
         "\n\
         Debugging flags:\n\
-        - FAKE_INPUT_DATA: {}\n\
+        - FAKE_INPUT_DATA:           {}\n\
         - FAKE_INPUT_CYCLES_PER_BUF: {}\n\
-        - FAKE_INPUT_AMPLITUDE: {}\n\
+        - FAKE_INPUT_AMPLITUDE:      {}\n\
+        - LOG_LAST_FEW_SAMPLES: {}\n\
+        - LOG_LAST_N_SAMPLES:   {}\n\
+        - LOG_ALL_FFT_AMPLITUDES: {}\n\
         Clocks:\n\
         - HSE_FREQ: {} Hz\n\
         - SYSCLK:   {} Hz\n\
@@ -28,6 +31,9 @@ pub fn dump_to_log() {
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
         debug::FAKE_INPUT_AMPLITUDE,
+        debug::LOG_LAST_FEW_SAMPLES,
+        debug::LOG_LAST_N_SAMPLES,
+        debug::LOG_ALL_FFT_AMPLITUDES,
         clk::HSE_FREQ.to_Hz(),
         clk::SYSCLK.to_Hz(),
         clk::PCLK1.to_Hz(),
@@ -35,10 +41,10 @@ pub fn dump_to_log() {
         clk::ADCCLK.to_Hz(),
         adc::CHANNELS,
         adc::OVERSAMPLE,
-        adc::SAMPLES_PER_SEC_RAW_X100 / 100,
-        adc::SAMPLES_PER_SEC_RAW_X100 % 100,
-        adc::SAMPLES_PER_SEC_PROCESSED_X100 / 100,
-        adc::SAMPLES_PER_SEC_PROCESSED_X100 % 100,
+        adc::SAMPLES_PER_SEC_RAW_X10 / 10,
+        adc::SAMPLES_PER_SEC_RAW_X10 % 10,
+        adc::SAMPLES_PER_SEC_PROCESSED_X10 / 10,
+        adc::SAMPLES_PER_SEC_PROCESSED_X10 % 10,
         adc::BUFFERS_PER_SEC,
         adc::BUF_LEN_RAW,
         adc::BUF_LEN_PROCESSED,
@@ -55,6 +61,11 @@ pub mod debug {
     pub const FAKE_INPUT_DATA: bool = false;
     pub const FAKE_INPUT_CYCLES_PER_BUF: usize = 8; // frequency = this * BUFFERS_PER_SEC
     pub const FAKE_INPUT_AMPLITUDE: u16 = u16::MAX / 2;
+
+    pub const LOG_LAST_FEW_SAMPLES: bool = false;
+    pub const LOG_LAST_N_SAMPLES: usize = 100;
+
+    pub const LOG_ALL_FFT_AMPLITUDES: bool = false;
 }
 
 /// Clock configuration
@@ -138,11 +149,11 @@ pub mod adc {
     };
 
     /// Number of raw ADC samples, per second (both channels, oversampled)
-    pub(super) const SAMPLES_PER_SEC_RAW_X100: usize =
-        100 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
+    pub(super) const SAMPLES_PER_SEC_RAW_X10: usize =
+        10 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
 
-    pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize =
-        SAMPLES_PER_SEC_RAW_X100 / CHANNELS / OVERSAMPLE;
+    pub(super) const SAMPLES_PER_SEC_PROCESSED_X10: usize =
+        SAMPLES_PER_SEC_RAW_X10 / CHANNELS / OVERSAMPLE;
 
     /// Swap buffers ~32 times per second
     /// Note that 1/32 notes (semidemiquavers) at 60 bpm are 1/8 second
@@ -153,7 +164,7 @@ pub mod adc {
     /// Note: this may not result in a perfect number of buffers per second,
     /// since it is unlikely that the sample rate is evenly divisible.
     pub const BUF_LEN_RAW: usize = {
-        let approx_len = SAMPLES_PER_SEC_RAW_X100 / BUFFERS_PER_SEC / 100;
+        let approx_len = SAMPLES_PER_SEC_RAW_X10 / BUFFERS_PER_SEC / 10;
         // make divisible by CHANNELS and OVERSAMPLE so processed buffer fits in perfectly
         let remainder = approx_len % (CHANNELS * OVERSAMPLE);
         approx_len - remainder
@@ -195,5 +206,5 @@ pub mod fft {
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_COMPLEX;
+        100 * config::adc::SAMPLES_PER_SEC_PROCESSED_X10 / BUF_LEN_COMPLEX;
 }
