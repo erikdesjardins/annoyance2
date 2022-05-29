@@ -690,6 +690,11 @@
     (uuid f68e48ba-1983-4674-be66-79dbf442fe2e)
   )
 
+  (text "Component Notes:\n- output LED is actually IF-E96E (fiber optic transmitter)\n- bipolar caps are film (not ceramic to avoid microphone effects); and\n- polarized caps are aluminum polymer"
+    (at 177.8 175.26 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 034cb194-900b-4b6f-b5b4-9aaad4816cbf)
+  )
   (text "Sizing: ~30kHz\nlow-pass filter" (at 54.61 76.2 0)
     (effects (font (size 0.635 0.635)) (justify left bottom))
     (uuid 04ecc5b9-1245-4cd5-a81b-6d27476f97b6)
