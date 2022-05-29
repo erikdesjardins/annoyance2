@@ -104,7 +104,7 @@ pub fn compute_stats(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX]) {
     let mut val_at_max = Complex::new(0, 0);
 
     // only look at positive, non-DC frequencies in first half of array
-    for i in 2..bins.len() / 2 {
+    for i in 1..bins.len() / 2 {
         let amplitude_squared = amplitude_squared(bins[i]);
         if amplitude_squared > max_amplitude_squared {
             max_amplitude_squared = amplitude_squared;
