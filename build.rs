@@ -8,7 +8,7 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
 
-    gen_adc_sin_table(out_dir);
+    gen_fake_cos_table(out_dir);
     gen_fft_sin_table(out_dir);
     gen_hamming(out_dir);
     gen_hann(out_dir);
@@ -17,16 +17,36 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 }
 
-fn gen_adc_sin_table(out_dir: &Path) {
+fn gen_fake_cos_table(out_dir: &Path) {
     const LEN: usize = 633;
 
-    write_sin_table::<LEN>(&out_dir.join("adc_sin_table.rs"));
+    let table = {
+        let mut table = [0; LEN];
+        for (i, x) in table.iter_mut().enumerate() {
+            let sample = f64::cos(2.0 * f64::consts::PI * i as f64 / LEN as f64);
+            let fixed_point = (i16::MAX as f64 * sample).round() as i16;
+            *x = fixed_point;
+        }
+        table
+    };
+
+    write_table(&out_dir.join("fake_cos_table.rs"), &table);
 }
 
 fn gen_fft_sin_table(out_dir: &Path) {
     const LEN: usize = 1024;
 
-    write_sin_table::<LEN>(&out_dir.join("fft_sin_table.rs"));
+    let table = {
+        let mut table = [0; LEN];
+        for (i, x) in table.iter_mut().enumerate() {
+            let sample = f64::sin(2.0 * f64::consts::PI * i as f64 / LEN as f64);
+            let fixed_point = (i16::MAX as f64 * sample).round() as i16;
+            *x = fixed_point;
+        }
+        table
+    };
+
+    write_table(&out_dir.join("fft_sin_table.rs"), &table);
 }
 
 fn gen_hamming(out_dir: &Path) {
@@ -39,20 +59,6 @@ fn gen_hann(out_dir: &Path) {
 
 fn gen_blackman(out_dir: &Path) {
     write_window_coefficients(&out_dir.join("blackman.rs"), [0.42, 0.5, 0.08, 0.]);
-}
-
-fn write_sin_table<const LEN: usize>(file_path: &Path) {
-    let table = {
-        let mut table = [0; LEN];
-        for (i, x) in table.iter_mut().enumerate() {
-            let sample = f64::sin(2.0 * f64::consts::PI * i as f64 / LEN as f64);
-            let fixed_point = (i16::MAX as f64 * sample).round() as i16;
-            *x = fixed_point;
-        }
-        table
-    };
-
-    write_table(file_path, &table)
 }
 
 fn write_window_coefficients(file_path: &Path, a: [f64; 4]) {

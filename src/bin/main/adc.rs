@@ -36,7 +36,7 @@ pub fn process_raw_samples(
     }
 
     if config::debug::FAKE_INPUT_DATA {
-        output.copy_from_slice(&FAKE_SIN_TABLE);
+        output.copy_from_slice(&FAKE_COS_TABLE);
     }
 
     if config::debug::LOG_LAST_FEW_SAMPLES {
@@ -48,16 +48,18 @@ pub fn process_raw_samples(
     }
 }
 
-static FAKE_SIN_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
+static FAKE_COS_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
     const LEN: usize = config::adc::BUF_LEN_PROCESSED;
 
-    const SIN_TABLE: [i16; LEN] = include!(concat!(env!("OUT_DIR"), "/adc_sin_table.rs"));
+    const COS_TABLE: [i16; LEN] = include!(concat!(env!("OUT_DIR"), "/fake_cos_table.rs"));
 
     let mut fake = [0; LEN];
 
     let mut i = 0;
     while i < LEN {
-        let unscaled_sample = SIN_TABLE[i * config::debug::FAKE_INPUT_CYCLES_PER_BUF % LEN];
+        let frequency = i * config::debug::FAKE_INPUT_CYCLES_PER_BUF;
+        let phase = config::debug::FAKE_INPUT_PHASE * LEN / u16::MAX as usize;
+        let unscaled_sample = COS_TABLE[(frequency + phase) % LEN];
         fake[i] = scale_by(unscaled_sample, config::debug::FAKE_INPUT_AMPLITUDE);
         i += 1;
     }
