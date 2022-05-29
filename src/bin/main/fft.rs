@@ -67,12 +67,17 @@ fn radix2(f: &mut [Complex<i16>; N]) {
         for m in 0..stride {
             // compute twiddle factors
             let iw = m << inverse_stage;
-            let wr = SIN_TABLE[iw + N / 4] >> 1;
-            let wi = -SIN_TABLE[iw] >> 1;
+            let wr = i32::from(SIN_TABLE[iw + N / 4] >> 1);
+            let wi = i32::from(-SIN_TABLE[iw] >> 1);
             for i in (m..N).into_iter().step_by(step) {
                 let j = i + stride;
-                let tr = fix_mpy(wr, f[j].re) - fix_mpy(wi, f[j].im);
-                let ti = fix_mpy(wr, f[j].im) + fix_mpy(wi, f[j].re);
+                // apply twiddle factors
+                // round up based on the last bit that's about to be shifted out
+                let round = 1 << 14;
+                let tr =
+                    (((wr * i32::from(f[j].re) - wi * i32::from(f[j].im)) + round) >> 15) as i16;
+                let ti =
+                    (((wr * i32::from(f[j].im) + wi * i32::from(f[j].re)) + round) >> 15) as i16;
                 // fixed scaling, for proper normalization --
                 // there will be log2(n) passes, so this results
                 // in an overall factor of 1/n, distributed to
@@ -90,15 +95,6 @@ fn radix2(f: &mut [Complex<i16>; N]) {
 
 fn isolate_highest_set_bit(x: usize) -> usize {
     (1 << usize::BITS - 1) >> x.leading_zeros()
-}
-
-fn fix_mpy(a: i16, b: i16) -> i16 {
-    let product = i32::from(a) * i32::from(b);
-    // round up based on the last bit that's about to be shifted out
-    // this matches behavior of fix_fft.c, and is equivalent (https://alive2.llvm.org/ce/z/6TGPCe),
-    // but why? it's not clear why rounding should be preferred over simple truncation here
-    let rounded = product + (1 << 14);
-    (rounded >> 15) as i16
 }
 
 #[inline(never)]
