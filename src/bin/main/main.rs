@@ -20,7 +20,6 @@ mod config;
 mod fft;
 mod fixed;
 mod panic;
-mod window;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]
 mod app {
@@ -28,7 +27,6 @@ mod app {
     use crate::config;
     use crate::fft;
     use crate::panic::OptionalExt;
-    use crate::window;
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use embedded_hal::adc::Channel;
@@ -212,7 +210,7 @@ mod app {
             let scratch = cx.local.fft_buf;
 
             let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PROCESSED);
-            let values: &mut [i16; config::adc::BUF_LEN_PROCESSED] =
+            let values: &mut [_; config::adc::BUF_LEN_PROCESSED] =
                 values.try_into().unwrap_infallible();
 
             // populate values and padding in FFT scratch buffer
@@ -220,13 +218,13 @@ mod app {
             padding.fill(0);
 
             // apply window function to data
-            window::apply_to(values);
+            fft::window::apply_to(values);
 
             // run fft
             let bins = fft::run(scratch);
 
             // find peaks in spectrum
-            fft::compute_stats(bins);
+            fft::analysis::find_peaks(bins);
         });
 
         cx.local.debug_led.set_high();
