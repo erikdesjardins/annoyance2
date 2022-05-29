@@ -47,19 +47,19 @@ mod app {
         use stm32f1xx_hal::gpio::{Alternate, Analog, Output, Pin, PushPull, CRH, CRL};
 
         pub type A0_ADC1C0 = Pin<Analog, CRL, 'A', 0>;
-        pub type A1_ADC1C1 = Pin<Analog, CRL, 'A', 1>;
+        pub type A4_ADC1C4 = Pin<Analog, CRL, 'A', 4>;
         pub type A2_PWM_VIRT_GND = Pin<Alternate<PushPull>, CRL, 'A', 2>;
         // pub type A8_TIM1C1_PULSE = Pin<Digital, CRL, 'A', 8>;
         pub type C13_DEBUG_LED = Pin<Output<PushPull>, CRH, 'C', 13>;
     }
 
-    pub struct AdcPins(pins::A0_ADC1C0, pins::A1_ADC1C1);
+    pub struct AdcPins(pins::A0_ADC1C0, pins::A4_ADC1C4);
 
     impl AdcPins {
         fn channels() -> [u8; 2] {
             [
                 <pins::A0_ADC1C0 as Channel<ADC1>>::channel(),
-                <pins::A1_ADC1C1 as Channel<ADC1>>::channel(),
+                <pins::A4_ADC1C4 as Channel<ADC1>>::channel(),
             ]
         }
     }
@@ -129,7 +129,7 @@ mod app {
         adc1.set_sample_time(config::adc::SAMPLE);
 
         let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
-        let adc_ch1: pins::A1_ADC1C1 = gpioa.pa1.into_analog(&mut gpioa.crl);
+        let adc_ch1: pins::A4_ADC1C4 = gpioa.pa4.into_analog(&mut gpioa.crl);
 
         let adc_dma = adc1.with_scan_dma(AdcPins(adc_ch0, adc_ch1), dma1_ch1);
 
