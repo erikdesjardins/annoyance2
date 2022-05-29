@@ -34,16 +34,14 @@ const N_LOG2: usize = usize::BITS as usize - 1 - N.leading_zeros() as usize;
 const _: () = assert!(N.is_power_of_two());
 
 /// Twiddle factors, used in the Radix-2 FFT algorithm.
-// put in RAM: ~300us improvement
-// #[link_section = ".data.adc::fft::PFW"]
-static PFW: [Complex<i16>; N / 4] = {
+static W: [Complex<i16>; N / 2] = {
     const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/fft_sin_table.rs"));
 
-    let mut twiddle = [Complex::new(0, 0); N / 4];
+    let mut twiddle = [Complex::new(0, 0); N / 2];
 
     let mut iw = 0;
     while iw < twiddle.len() {
-        let wr = SIN_TABLE[iw + SIN_TABLE.len() / 4] >> 1;
+        let wr = SIN_TABLE[iw + N / 4] >> 1;
         let wi = -SIN_TABLE[iw] >> 1;
         let w = Complex::new(wr, wi);
         twiddle[iw] = w;
@@ -55,62 +53,54 @@ static PFW: [Complex<i16>; N / 4] = {
 };
 
 #[inline(never)]
-#[rustfmt::skip]
-#[allow(clippy::cast_possible_truncation)]
-fn radix2(pfs: &mut [Complex<i16>; N]) {
+fn radix2(f: &mut [Complex<i16>; N]) {
+    // decimation in time - re-order data
+    let mut mr = 0;
+    for m in 1..N {
+        let l = isolate_highest_set_bit(N - 1 - mr);
+        mr = (mr & (l - 1)) + l;
+        if mr > m {
+            f.swap(m, mr);
+        }
+    }
+
     for stage in 0..N_LOG2 {
-        let stride = N >> (1 + stage);
-        let edirts = 1 << stage;
-        for blk in (0..N).into_iter().step_by(stride * 2) {
-            let pa = blk;
-            let pb = blk + stride / 2;
-            let qa = blk + stride;
-            let qb = blk + stride / 2 + stride;
-            for j in 0..stride / 2 {
-                let iw = j * edirts;
-                // scale inputs
-                pfs[pa + j].re >>= 1;
-                pfs[pa + j].im >>= 1;
-                pfs[qa + j].re >>= 1;
-                pfs[qa + j].im >>= 1;
-                pfs[pb + j].re >>= 1;
-                pfs[pb + j].im >>= 1;
-                pfs[qb + j].re >>= 1;
-                pfs[qb + j].im >>= 1;
-                // add
-                let ft1a = Complex {
-                    re: pfs[pa + j].re + pfs[qa + j].re,
-                    im: pfs[pa + j].im + pfs[qa + j].im,
-                };
-                let ft1b = Complex {
-                    re: pfs[pb + j].re + pfs[qb + j].re,
-                    im: pfs[pb + j].im + pfs[qb + j].im,
-                };
-                // sub
-                let ft2a = Complex {
-                    re: pfs[pa + j].re - pfs[qa + j].re,
-                    im: pfs[pa + j].im - pfs[qa + j].im,
-                };
-                let ft2b = Complex {
-                    re: pfs[pb + j].re - pfs[qb + j].re,
-                    im: pfs[pb + j].im - pfs[qb + j].im,
-                };
-                // store adds
-                pfs[pa + j] = ft1a;
-                pfs[pb + j] = ft1b;
-                // cmul
-                let tmp = (i32::from(ft2a.re) * i32::from(PFW[iw].re)) - (i32::from(ft2a.im) * i32::from(PFW[iw].im));
-                pfs[qa + j].re = (tmp >> 15) as i16;
-                let tmp = (i32::from(ft2a.re) * i32::from(PFW[iw].im)) + (i32::from(ft2a.im) * i32::from(PFW[iw].re));
-                pfs[qa + j].im = (tmp >> 15) as i16;
-                // twiddled cmul
-                let tmp = (i32::from(ft2b.re) * i32::from(PFW[iw].im)) + (i32::from(ft2b.im) * i32::from(PFW[iw].re));
-                pfs[qb + j].re = (tmp >> 15) as i16;
-                let tmp = (i32::from(ft2b.im) * i32::from(PFW[iw].im)) - (i32::from(ft2b.re) * i32::from(PFW[iw].re));
-                pfs[qb + j].im = (tmp >> 15) as i16;
+        let k = N_LOG2 - 1 - stage;
+        let l = 1 << stage;
+        let istep = l << 1;
+        for m in 0..l {
+            let iw = m << k;
+            let w = W[iw];
+            for i in (m..N).into_iter().step_by(istep) {
+                let j = i + l;
+                let tr = fix_mpy(w.re, f[j].re) - fix_mpy(w.im, f[j].im);
+                let ti = fix_mpy(w.re, f[j].im) + fix_mpy(w.im, f[j].re);
+                // fixed scaling, for proper normalization --
+                // there will be log2(n) passes, so this results
+                // in an overall factor of 1/n, distributed to
+                // maximize arithmetic accuracy.
+                let qr = f[i].re >> 1;
+                let qi = f[i].im >> 1;
+                f[j].re = qr - tr;
+                f[j].im = qi - ti;
+                f[i].re = qr + tr;
+                f[i].im = qi + ti;
             }
         }
     }
+}
+
+fn isolate_highest_set_bit(x: usize) -> usize {
+    (1 << usize::BITS - 1) >> x.leading_zeros()
+}
+
+fn fix_mpy(a: i16, b: i16) -> i16 {
+    let product = i32::from(a) * i32::from(b);
+    // round up based on the last bit that's about to be shifted out
+    // this matches behavior of fix_fft.c, and is equivalent (https://alive2.llvm.org/ce/z/6TGPCe),
+    // but why? it's not clear why rounding should be preferred over simple truncation here
+    let rounded = product + (1 << 14);
+    (rounded >> 15) as i16
 }
 
 #[inline(never)]
