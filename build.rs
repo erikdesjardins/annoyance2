@@ -11,8 +11,8 @@ fn main() {
     gen_adc_sin_table(out_dir);
     gen_fft_sin_table(out_dir);
     gen_hamming(out_dir);
-    gen_blackman_nutall(out_dir);
-    gen_blackman_harris(out_dir);
+    gen_hann(out_dir);
+    gen_blackman(out_dir);
 
     println!("cargo:rerun-if-changed=build.rs");
 }
@@ -33,18 +33,12 @@ fn gen_hamming(out_dir: &Path) {
     write_window_coefficients(&out_dir.join("hamming.rs"), [0.53836, 0.46164, 0., 0.]);
 }
 
-fn gen_blackman_nutall(out_dir: &Path) {
-    write_window_coefficients(
-        &out_dir.join("blackman_nutall.rs"),
-        [0.3635819, 0.4891775, 0.1365995, 0.0106411],
-    );
+fn gen_hann(out_dir: &Path) {
+    write_window_coefficients(&out_dir.join("hann.rs"), [0.5, 0.5, 0., 0.]);
 }
 
-fn gen_blackman_harris(out_dir: &Path) {
-    write_window_coefficients(
-        &out_dir.join("blackman_harris.rs"),
-        [0.35875, 0.48829, 0.14128, 0.01168],
-    );
+fn gen_blackman(out_dir: &Path) {
+    write_window_coefficients(&out_dir.join("blackman.rs"), [0.42, 0.5, 0.08, 0.]);
 }
 
 fn write_sin_table<const LEN: usize>(file_path: &Path) {

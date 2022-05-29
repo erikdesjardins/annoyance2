@@ -6,11 +6,10 @@ use crate::fixed::scale_by;
 static HAMMING: [u16; config::adc::BUF_LEN_PROCESSED] =
     include!(concat!(env!("OUT_DIR"), "/hamming.rs"));
 
-static BLACKMAN_NUTALL: [u16; config::adc::BUF_LEN_PROCESSED] =
-    include!(concat!(env!("OUT_DIR"), "/blackman_nutall.rs"));
+static HANN: [u16; config::adc::BUF_LEN_PROCESSED] = include!(concat!(env!("OUT_DIR"), "/hann.rs"));
 
-static BLACKMAN_HARRIS: [u16; config::adc::BUF_LEN_PROCESSED] =
-    include!(concat!(env!("OUT_DIR"), "/blackman_harris.rs"));
+static BLACKMAN: [u16; config::adc::BUF_LEN_PROCESSED] =
+    include!(concat!(env!("OUT_DIR"), "/blackman.rs"));
 
 #[inline(never)]
 pub fn apply_to(data: &mut [i16; config::adc::BUF_LEN_PROCESSED]) {
@@ -20,8 +19,8 @@ pub fn apply_to(data: &mut [i16; config::adc::BUF_LEN_PROCESSED]) {
             return;
         }
         config::fft::Window::Hamming => HAMMING,
-        config::fft::Window::BlackmanNutall => BLACKMAN_NUTALL,
-        config::fft::Window::BlackmanHarris => BLACKMAN_HARRIS,
+        config::fft::Window::Hann => HANN,
+        config::fft::Window::Blackman => BLACKMAN,
     };
 
     assert_eq!(data.len(), window.len());

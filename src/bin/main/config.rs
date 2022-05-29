@@ -175,17 +175,39 @@ pub mod fft {
     use crate::config;
     use defmt::Format;
 
+    /// Possible window functions to apply to sampled data before running the FFT.
+    ///
+    /// Window functions closer to the top have less attenuation and more frequency resolution (sharper peaks),
+    /// but more significant sidelobes and noise.
+    ///
+    /// Amplitudes below are with FAKE_INPUT_CYCLES_PER_BUF=8 and FAKE_INPUT_AMPLITUDE=u16::MAX/2.
     #[allow(dead_code)]
     #[derive(Format)]
     pub enum Window {
+        /// Hard-edged rectangle window.
+        ///
+        /// Provides little attenuation (amplitude 3400).
+        /// Provides the sharpest peaks, but with significant ringing.
+        /// Generally should not be used except for debugging.
         Rectangle,
+        /// Hamming window.
+        ///
+        /// Provides some attenuation (amplitude 1700).
+        /// Provides slightly sharper peaks than Hann, and lower sidelobes, but with slightly more ringing.
         Hamming,
-        BlackmanNutall,
-        BlackmanHarris,
+        /// Hann window.
+        ///
+        /// Provides some attenuation (amplitude 1800).
+        Hann,
+        /// Blackman window.
+        ///
+        /// Provides some attenuation (amplitude 1400).
+        /// Provides slightly wider peaks than Hamming or Hann, but with very good suppression of sidelobes and ringing.
+        Blackman,
     }
 
     /// Window type for filtering FFT input
-    pub const WINDOW: Window = Window::BlackmanHarris;
+    pub const WINDOW: Window = Window::Hamming;
 
     /// FFT buffer size should be as large as possible for higher resolution
     pub const BUF_LEN_REAL: usize = 2048;
