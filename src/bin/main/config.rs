@@ -3,7 +3,7 @@ pub fn dump_to_log() {
         "\n\
         Debugging flags:\n\
         - FAKE_INPUT_DATA:           {}\n\
-        - FAKE_INPUT_CYCLES_PER_BUF: {}\n\
+        - FAKE_INPUT_CYCLES_PER_BUF: {} ({} Hz)\n\
         - FAKE_INPUT_AMPLITUDE:      {}\n\
         - LOG_LAST_FEW_SAMPLES: {}\n\
         - LOG_LAST_N_SAMPLES:   {}\n\
@@ -30,6 +30,7 @@ pub fn dump_to_log() {
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
+        debug::FAKE_INPUT_CYCLES_PER_BUF * adc::BUFFERS_PER_SEC,
         debug::FAKE_INPUT_AMPLITUDE,
         debug::LOG_LAST_FEW_SAMPLES,
         debug::LOG_LAST_N_SAMPLES,
