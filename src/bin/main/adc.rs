@@ -1,5 +1,6 @@
 use crate::config;
 use crate::fixed::scale_by;
+use crate::panic::OptionalExt;
 
 #[inline(never)]
 pub fn process_raw_samples(
@@ -23,7 +24,8 @@ pub fn process_raw_samples(
         // subtract groups of samples
         let difference = channel_b - channel_a;
         // scale down difference by oversample ratio
-        let difference = difference / config::adc::OVERSAMPLE as i32;
+        let oversample: i32 = config::adc::OVERSAMPLE.try_into().unwrap_infallible();
+        let difference: i32 = difference / oversample;
         // truncate difference
         let difference: i16 = difference.try_into().unwrap_or_else(|_| {
             if cfg!(debug_assertions) {

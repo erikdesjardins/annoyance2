@@ -1,5 +1,7 @@
 //! Debugging flags
 
+#![allow(clippy::erasing_op)]
+
 pub const FAKE_INPUT_DATA: bool = false;
 pub const FAKE_INPUT_CYCLES_PER_BUF: usize = 8 /* frequency = this * BUFFERS_PER_SEC */;
 pub const FAKE_INPUT_PHASE: usize = 0 * u16::MAX as usize / 4 /* phase = 2pi * this / u16::MAX */;
