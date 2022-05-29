@@ -5,6 +5,8 @@ const N: usize = config::fft::BUF_LEN_COMPLEX;
 const N_LOG2: usize = usize::BITS as usize - 1 - N.leading_zeros() as usize;
 const _: () = assert!(N.is_power_of_two());
 
+const SCALE: i16 = 1;
+
 static SIN_TABLE: [i16; N * 3 / 4] = {
     const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/fft_sin_table.rs"));
 
@@ -41,8 +43,8 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
         for m in 0..stride {
             // compute twiddle factors
             let iw = m << inverse_stage;
-            let wr = i32::from(SIN_TABLE[iw + N / 4] >> 1);
-            let wi = i32::from(-SIN_TABLE[iw] >> 1);
+            let wr = i32::from(SIN_TABLE[iw + N / 4] >> SCALE);
+            let wi = i32::from(-SIN_TABLE[iw] >> SCALE);
             #[allow(clippy::cast_possible_truncation)]
             for i in (m..N).into_iter().step_by(step) {
                 let j = i + stride;
@@ -57,8 +59,8 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
                 // there will be log2(n) passes, so this results
                 // in an overall factor of 1/n, distributed to
                 // maximize arithmetic accuracy.
-                let qr = f[i].re >> 1;
-                let qi = f[i].im >> 1;
+                let qr = f[i].re >> SCALE;
+                let qi = f[i].im >> SCALE;
                 f[j].re = qr - tr;
                 f[j].im = qi - ti;
                 f[i].re = qr + tr;
