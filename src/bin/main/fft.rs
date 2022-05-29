@@ -33,23 +33,19 @@ const N: usize = config::fft::BUF_LEN_COMPLEX;
 const N_LOG2: usize = usize::BITS as usize - 1 - N.leading_zeros() as usize;
 const _: () = assert!(N.is_power_of_two());
 
-/// Twiddle factors, used in the Radix-2 FFT algorithm.
-static W: [Complex<i16>; N / 2] = {
+static SIN_TABLE: [i16; N * 3 / 4] = {
     const SIN_TABLE: [i16; N] = include!(concat!(env!("OUT_DIR"), "/fft_sin_table.rs"));
 
-    let mut twiddle = [Complex::new(0, 0); N / 2];
+    let mut sin = [0; N * 3 / 4];
 
-    let mut iw = 0;
-    while iw < twiddle.len() {
-        let wr = SIN_TABLE[iw + N / 4] >> 1;
-        let wi = -SIN_TABLE[iw] >> 1;
-        let w = Complex::new(wr, wi);
-        twiddle[iw] = w;
+    let mut i = 0;
+    while i < sin.len() {
+        sin[i] = SIN_TABLE[i];
 
-        iw += 1;
+        i += 1;
     }
 
-    twiddle
+    sin
 };
 
 #[inline(never)]
@@ -65,16 +61,18 @@ fn radix2(f: &mut [Complex<i16>; N]) {
     }
 
     for stage in 0..N_LOG2 {
-        let k = N_LOG2 - 1 - stage;
-        let l = 1 << stage;
-        let istep = l << 1;
-        for m in 0..l {
-            let iw = m << k;
-            let w = W[iw];
-            for i in (m..N).into_iter().step_by(istep) {
-                let j = i + l;
-                let tr = fix_mpy(w.re, f[j].re) - fix_mpy(w.im, f[j].im);
-                let ti = fix_mpy(w.re, f[j].im) + fix_mpy(w.im, f[j].re);
+        let inverse_stage = N_LOG2 - 1 - stage;
+        let stride = 1 << stage;
+        let step = stride << 1;
+        for m in 0..stride {
+            // compute twiddle factors
+            let iw = m << inverse_stage;
+            let wr = SIN_TABLE[iw + N / 4] >> 1;
+            let wi = -SIN_TABLE[iw] >> 1;
+            for i in (m..N).into_iter().step_by(step) {
+                let j = i + stride;
+                let tr = fix_mpy(wr, f[j].re) - fix_mpy(wi, f[j].im);
+                let ti = fix_mpy(wr, f[j].im) + fix_mpy(wi, f[j].re);
                 // fixed scaling, for proper normalization --
                 // there will be log2(n) passes, so this results
                 // in an overall factor of 1/n, distributed to
