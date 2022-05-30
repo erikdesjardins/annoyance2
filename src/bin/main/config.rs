@@ -28,8 +28,9 @@ pub fn dump_to_log() {
         - BUF_LEN_COMPLEX: {}\n\
         - FREQ_RESOLUTION: {}.{} Hz\n\
         FFT analysis:\n\
-        - PEAKS: {}\n\
+        - MAX_PEAKS: {}\n\
         - AMPLITUDE_THRESHOLD: {}\n\
+        - MAX_BINS_FOR_FREQ_AVERAGING: {}\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -57,8 +58,9 @@ pub fn dump_to_log() {
         fft::BUF_LEN_COMPLEX,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
-        fft::analysis::PEAKS,
+        fft::analysis::MAX_PEAKS,
         fft::analysis::AMPLITUDE_THRESHOLD,
+        fft::analysis::MAX_BINS_FOR_FREQ_AVERAGING,
     );
 }
 
@@ -215,6 +217,7 @@ pub mod fft {
 
     /// FFT buffer size should be as large as possible for higher resolution
     pub const BUF_LEN_REAL: usize = 2048;
+
     const _: () = assert!(BUF_LEN_REAL.is_power_of_two());
     const _: () = assert!(BUF_LEN_REAL >= config::adc::BUF_LEN_PROCESSED);
 
@@ -227,10 +230,20 @@ pub mod fft {
 
     pub mod analysis {
         /// Maximum number of peaks to find in the FFT spectrum
-        pub const PEAKS: usize = 5;
+        pub const MAX_PEAKS: usize = 5;
 
         /// Minimum amplitude for a FFT bin to be considered a peak
         pub(in crate::config) const AMPLITUDE_THRESHOLD: u16 = 50;
         pub const AMPLITUDE_THRESHOLD_SQUARED: u32 = (AMPLITUDE_THRESHOLD as u32).pow(2);
+
+        /// Maximum number of bins to average when finding the actual frequency of a peak
+        pub(in crate::config) const MAX_BINS_FOR_FREQ_AVERAGING: usize = 5;
+        pub const MAX_RANGE_FOR_FREQ_AVERAGING_PER_SIDE: usize =
+            (MAX_BINS_FOR_FREQ_AVERAGING - 1) / 2;
+
+        const _: () = assert!(
+            MAX_BINS_FOR_FREQ_AVERAGING % 2 == 1,
+            "bins should be odd so the sample range is symmetrical about the peak"
+        );
     }
 }
