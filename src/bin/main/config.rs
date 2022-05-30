@@ -27,6 +27,9 @@ pub fn dump_to_log() {
         - BUF_LEN_REAL:    {}\n\
         - BUF_LEN_COMPLEX: {}\n\
         - FREQ_RESOLUTION: {}.{} Hz\n\
+        FFT analysis:\n\
+        - PEAKS: {}\n\
+        - AMPLITUDE_THRESHOLD: {}\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -54,6 +57,8 @@ pub fn dump_to_log() {
         fft::BUF_LEN_COMPLEX,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
+        fft::analysis::PEAKS,
+        fft::analysis::AMPLITUDE_THRESHOLD,
     );
 }
 
@@ -219,4 +224,13 @@ pub mod fft {
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
         100 * config::adc::SAMPLES_PER_SEC_PROCESSED_X10 / BUF_LEN_COMPLEX;
+
+    pub mod analysis {
+        /// Maximum number of peaks to find in the FFT spectrum
+        pub const PEAKS: usize = 5;
+
+        /// Minimum amplitude for a FFT bin to be considered a peak
+        pub(in crate::config) const AMPLITUDE_THRESHOLD: u16 = 50;
+        pub const AMPLITUDE_THRESHOLD_SQUARED: u32 = (AMPLITUDE_THRESHOLD as u32).pow(2);
+    }
 }
