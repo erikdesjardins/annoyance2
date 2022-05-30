@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude_squared, phase, scale_by, sqrt};
+use crate::fixed::{amplitude_squared, phase, sqrt};
 use num_complex::Complex;
 
 #[inline(never)]
@@ -20,14 +20,12 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
     let max_amplitude = sqrt(max_amplitude_squared);
     let freq_at_max = i_at_max * config::fft::FREQ_RESOLUTION_X1000 / 1000;
     let phase_at_max = phase(val_at_max);
-    let deg_at_max = scale_by(360, (phase_at_max >> 16) as u16);
 
     defmt::info!(
-        "Max amplitude = {} @ freq = {} Hz, phase = {}/{} cycles (~{} deg)",
-        max_amplitude,
+        "Max amplitude = {} @ freq = {} Hz, phase = {}.{} rad",
+        max_amplitude.int().to_bits() >> 32,
         freq_at_max,
-        phase_at_max,
-        u32::MAX,
-        deg_at_max,
+        phase_at_max.int().to_bits() >> 32,
+        phase_at_max.frac().to_bits(),
     );
 }

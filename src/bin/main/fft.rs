@@ -29,7 +29,10 @@ pub fn run(
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
         let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX / 2];
         for (amp, bin) in amplitudes.iter_mut().zip(bins) {
-            *amp = (sqrt(amplitude_squared(*bin)) >> 32) as u16;
+            let decimal_amp = sqrt(amplitude_squared(*bin));
+            let raw_amp: u64 = decimal_amp.to_bits();
+            let amp_no_fractional_bits = (raw_amp >> 32) as u16;
+            *amp = amp_no_fractional_bits;
         }
         defmt::println!(
             "FFT ({}.{} Hz per each of {} buckets): {}",
