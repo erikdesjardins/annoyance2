@@ -38,7 +38,12 @@ mod app {
     use stm32f1xx_hal::timer::Tim2NoRemap;
 
     #[monotonic(binds = SysTick, default = true)]
-    type DwtMono = DwtSystick<{ config::clk::SYSCLK_HZ }>;
+    type DwtMono = DwtSystick<
+        {
+            const HZ: u32 = config::clk::SYSCLK.to_Hz();
+            HZ
+        },
+    >;
 
     #[allow(non_camel_case_types)]
     mod pins {

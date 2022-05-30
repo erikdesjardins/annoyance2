@@ -80,7 +80,6 @@ pub mod clk {
 
     /// PLLMUL @ x9 (max 72MHz)
     pub const SYSCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(72);
-    pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
