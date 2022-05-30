@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude_squared, phase, sqrt};
+use crate::fixed::{amplitude_sqrt, amplitude_squared, phase, scale_by};
 use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
@@ -107,21 +107,20 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
 
     for peak in peaks {
         let bin = bins[peak.i];
-        let max_amplitude = sqrt(amplitude_squared(bin));
-        let phase_at_max = phase(bin);
+        let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
+        let deg_at_max = scale_by(360, phase(bin));
 
         let center_freq = i_to_freq(peak.i);
         let left_freq = i_to_freq(peak.left);
         let right_freq = i_to_freq(peak.right);
 
         defmt::info!(
-            "Peak amplitude = {} @ freq = {} ({} to {}) Hz, phase = {}.{} rad",
-            max_amplitude.int().to_bits() >> 32,
+            "Peak amplitude = {} @ freq = {} ({} to {}) Hz, phase = {} deg",
+            max_amplitude,
             center_freq,
             left_freq,
             right_freq,
-            phase_at_max.int().to_bits() >> 32,
-            phase_at_max.frac().to_bits(),
+            deg_at_max,
         );
     }
 }

@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude_squared, sqrt};
+use crate::fixed::{amplitude_sqrt, amplitude_squared};
 use crate::panic::OptionalExt;
 use core::mem;
 use num_complex::Complex;
@@ -29,10 +29,7 @@ pub fn run(
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
         let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX / 2];
         for (amp, bin) in amplitudes.iter_mut().zip(bins) {
-            let decimal_amp = sqrt(amplitude_squared(*bin));
-            let raw_amp: u64 = decimal_amp.to_bits();
-            let amp_no_fractional_bits = (raw_amp >> 32) as u16;
-            *amp = amp_no_fractional_bits;
+            *amp = amplitude_sqrt(amplitude_squared(*bin));
         }
         defmt::println!(
             "FFT ({}.{} Hz per each of {} buckets): {}",
