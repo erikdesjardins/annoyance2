@@ -1,5 +1,7 @@
 use crate::config;
 use crate::fixed::{amplitude_sqrt, amplitude_squared, phase, scale_by};
+use crate::num::Truncate;
+use crate::panic::OptionalExt;
 use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
@@ -103,11 +105,11 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
 
     let peaks = &peaks[..actual_peaks];
 
-    // Phase 2: refine the peak frequency by weighted averaging of bins in the peak
+    // Phase 2: refine the peak frequency based on shape of the peak
     //
     // For example:
     //
-    //       \/ --- the frequency is actually a bit to the right of the maximum-amplitude bin,
+    //       \/ --- the real peak frequency is actually a bit to the right of the maximum-amplitude bin,
     // amp          since the peak has higher amplitudes on the right side
     // ^
     // |     .
@@ -116,36 +118,79 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
     // | ...    ...
     // +-----------> freq
     //
+    // If we look just at the 3 closest bins:
     //
+    // ...here, the peak frequency is exactly the middle bin
+    // ^
+    // |  .
+    // | . .
+    // +----->
+    //
+    // ...here, the peak frequency is exactly halfway between the middle bin and right bin
+    // ^
+    // |  ..
+    // | .
+    // +----->
+    //
+    // ...here, the peak frequency is somewhere between the middle bin and halfway to the right bin
+    //    (which we approximate, linearly, as being 1/4 to the right bin)
+    // ^
+    // |  .
+    // |   .
+    // | .
+    // +----->
 
     let mut peak_freqs = [0; config::fft::analysis::MAX_PEAKS];
 
     for i_peak in 0..peaks.len() {
-        // Step 1: find range of buckets within peak to average
         let peak = &peaks[i_peak];
-        let range_per_side = (peak.i - peak.left)
-            .min(peak.right - peak.i)
-            .min(config::fft::analysis::MAX_RANGE_FOR_FREQ_AVERAGING_PER_SIDE);
-        // Step 2: perform weighted averaging
-        let mut sum = 0;
-        let mut total_weight = 0;
-        for i in peak.i - range_per_side..=peak.i + range_per_side {
-            let amplitude: u16 = amplitude_sqrt(amplitude_squared(bins[i]));
-            let freq: u16 = i_to_freq(i);
-            sum += u32::from(amplitude) * u32::from(freq);
-            total_weight += u32::from(amplitude);
-        }
-        let avg_freq: u32 = sum / total_weight;
-        // truncate frequency, which should work since we're only dealing with small frequencies
-        let avg_freq: u16 = avg_freq.try_into().unwrap_or_else(|_| {
-            if cfg!(debug_assertions) {
-                panic!("overflow in peak frequency averaging: {}", avg_freq);
-            } else {
-                0
-            }
+
+        // Step 1: compute amplitudes
+        let center = amplitude_sqrt(amplitude_squared(bins[peak.i]));
+        let sides = [peak.i - 1, peak.i + 1].map(|i| match bins.get(i) {
+            Some(bin) => amplitude_sqrt(amplitude_squared(*bin)),
+            // at extreme values, duplicate the center amplitude
+            None => center,
         });
-        // Step 3: store frequency
-        peak_freqs[i_peak] = avg_freq;
+
+        // Step 2: determine whether to adjust the frequency positively (right) or negatively (left)
+        let is_positive = sides[0] < sides[1];
+        let (small_side, large_side) = if is_positive {
+            (sides[0], sides[1])
+        } else {
+            (sides[1], sides[0])
+        };
+
+        // Step 3: normalize amplitudes so the small side is at 0
+        let center = center - small_side;
+        let large_side = large_side - small_side;
+        #[allow(unused_variables)]
+        let small_side = ();
+
+        // Step 4: compute adjustment (from 0 to 1/2 of bin resolution)
+        // e.g. at this point, we have
+        //   ^
+        // 4 |  .     <- center
+        // 2 |   .    <- large_side
+        // 0 | .      <- small_side
+        //   +----->
+        // in which case the frequency should be scaled by 2/4 * (1/2 * resolution)
+        let center: usize = center.try_into().unwrap_infallible();
+        let large_side: usize = large_side.try_into().unwrap_infallible();
+        // adjustment = large_side/center * 1/2 * resolution
+        let adjustment = large_side * config::fft::FREQ_RESOLUTION_X1000 / center / 1000 / 2;
+        // truncate: we expect adjustment to be on the order of 10 Hz
+        let adjustment: u16 = adjustment.truncate();
+
+        // Step 5: apply adjustment
+        let real_freq = if is_positive {
+            i_to_freq(peak.i) + adjustment
+        } else {
+            i_to_freq(peak.i) - adjustment
+        };
+
+        // Step 6: store adjustment
+        peak_freqs[i_peak] = real_freq;
     }
 
     // Phase 3: log peaks
@@ -176,7 +221,6 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
 fn i_to_freq(i: usize) -> u16 {
     let freq = i * config::fft::FREQ_RESOLUTION_X1000 / 1000;
     // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
-    #[allow(clippy::cast_possible_truncation)]
-    let freq = freq as u16;
+    let freq: u16 = freq.truncate();
     freq
 }
