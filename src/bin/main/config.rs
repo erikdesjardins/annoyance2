@@ -228,7 +228,7 @@ pub mod fft {
 
     pub mod analysis {
         /// Maximum number of peaks to find in the FFT spectrum
-        pub const MAX_PEAKS: usize = 5;
+        pub const MAX_PEAKS: usize = 8;
 
         /// Minimum amplitude for a FFT bin to be considered a peak
         pub(in crate::config) const AMPLITUDE_THRESHOLD: u16 = 50;
