@@ -178,18 +178,20 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
         let center: usize = center.try_into().unwrap_infallible();
         let large_side: usize = large_side.try_into().unwrap_infallible();
         // adjustment = large_side/center * 1/2 * resolution
-        let adjustment = large_side * config::fft::FREQ_RESOLUTION_X1000 / center / 1000 / 2;
-        // truncate: we expect adjustment to be on the order of 10 Hz
-        let adjustment: u16 = adjustment.truncate();
+        let adjustment_x1000 = large_side * config::fft::FREQ_RESOLUTION_X1000 / center / 2;
 
         // Step 5: apply adjustment
-        let real_freq = if is_positive {
-            i_to_freq(peak.i) + adjustment
+        let center_freq_x1000 = peak.i * config::fft::FREQ_RESOLUTION_X1000;
+        let real_freq_x1000 = if is_positive {
+            center_freq_x1000 + adjustment_x1000
         } else {
-            i_to_freq(peak.i) - adjustment
+            center_freq_x1000 - adjustment_x1000
         };
+        let real_freq = real_freq_x1000 / 1000;
+        // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
+        let real_freq: u16 = real_freq.truncate();
 
-        // Step 6: store adjustment
+        // Step 6: store adjusted frequency
         peak_freqs[i_peak] = real_freq;
     }
 
