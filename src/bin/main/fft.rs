@@ -25,7 +25,6 @@ pub fn run(
         .try_into()
         .unwrap_infallible();
 
-    #[allow(clippy::cast_possible_truncation)]
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
         let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX / 2];
         for (amp, bin) in amplitudes.iter_mut().zip(bins) {

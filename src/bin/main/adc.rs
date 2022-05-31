@@ -1,5 +1,6 @@
 use crate::config;
 use crate::fixed::scale_by;
+use crate::num::Truncate;
 use crate::panic::OptionalExt;
 
 #[inline(never)]
@@ -27,13 +28,7 @@ pub fn process_raw_samples(
         let oversample: i32 = config::adc::OVERSAMPLE.try_into().unwrap_infallible();
         let difference: i32 = difference / oversample;
         // truncate difference, which should fit because ADC only has 12 bits of resolution (hence max difference is 2^12)
-        let difference: i16 = difference.try_into().unwrap_or_else(|_| {
-            if cfg!(debug_assertions) {
-                panic!("overflow in difference truncation: {}", difference);
-            } else {
-                0
-            }
-        });
+        let difference: i16 = difference.truncate();
         *value = difference;
     }
 

@@ -19,6 +19,7 @@ mod adc;
 mod config;
 mod fft;
 mod fixed;
+mod num;
 mod panic;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]

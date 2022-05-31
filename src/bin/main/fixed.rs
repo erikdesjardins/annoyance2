@@ -1,5 +1,6 @@
 //! Utilities for fixed-point calculations.
 
+use crate::num::Truncate;
 use crate::panic::OptionalExt;
 use fixed::types::{I16F48, U32F0};
 use fixed_sqrt::FixedSqrt;
@@ -27,13 +28,7 @@ pub fn amplitude_sqrt(x: u32) -> u16 {
     let sqrt = FixedSqrt::sqrt(x);
     // truncate sqrt, which should fit into half the bits
     let bits: u32 = sqrt.to_bits();
-    let bits: u16 = bits.try_into().unwrap_or_else(|_| {
-        if cfg!(debug_assertions) {
-            panic!("overflow in sqrt truncation: {}", bits);
-        } else {
-            u16::MAX
-        }
-    });
+    let bits: u16 = bits.truncate();
     bits
 }
 
@@ -54,6 +49,7 @@ pub fn phase(x: Complex<i16>) -> u16 {
     let angle = angle / I16F48::PI / 2;
     // extract 16 most significant bits of fraction
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // deliberate truncation (shouldn't happen, but if it does, 0 cycles = 1 cycle [in phase], so it doesn't matter)
     let angle = (angle.to_bits() >> (48 - 16)) as u16;
     angle
 }
