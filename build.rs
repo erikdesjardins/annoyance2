@@ -18,7 +18,7 @@ fn main() {
 }
 
 fn gen_fake_cos_table(out_dir: &Path) {
-    const LEN: usize = 517;
+    const LEN: usize = 651;
 
     let table = {
         let mut table = [0; LEN];
@@ -62,7 +62,7 @@ fn gen_blackman(out_dir: &Path) {
 }
 
 fn write_window_coefficients(file_path: &Path, a: [f64; 4]) {
-    const LEN: usize = 517;
+    const LEN: usize = 651;
 
     let table = {
         let mut table = [0; LEN];

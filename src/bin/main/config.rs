@@ -133,7 +133,7 @@ pub mod adc {
     pub const OVERSAMPLE: usize = 1;
 
     /// Sample at ADCCLK / this
-    const SAMPLE_CYC_X10_UNADJUSTED: usize = 555;
+    const SAMPLE_CYC_X10_UNADJUSTED: usize = 415;
     pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10_UNADJUSTED {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
