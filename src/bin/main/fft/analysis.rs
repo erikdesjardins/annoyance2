@@ -1,6 +1,6 @@
 use crate::config;
 use crate::fixed::{amplitude_sqrt, amplitude_squared, phase, scale_by};
-use crate::num::Truncate;
+use crate::num::{DivRound, Truncate};
 use crate::panic::OptionalExt;
 use num_complex::Complex;
 
@@ -187,7 +187,7 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
         } else {
             center_freq_x1000 - adjustment_x1000
         };
-        let real_freq = real_freq_x1000 / 1000;
+        let real_freq = real_freq_x1000.div_round(1000);
         // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
         let real_freq: u16 = real_freq.truncate();
 
@@ -221,7 +221,7 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
 }
 
 fn i_to_freq(i: usize) -> u16 {
-    let freq = i * config::fft::FREQ_RESOLUTION_X1000 / 1000;
+    let freq = (i * config::fft::FREQ_RESOLUTION_X1000).div_round(1000);
     // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
     let freq: u16 = freq.truncate();
     freq
