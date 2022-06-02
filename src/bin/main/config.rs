@@ -45,10 +45,10 @@ pub fn dump_to_log() {
         clk::ADCCLK.to_Hz(),
         adc::CHANNELS,
         adc::OVERSAMPLE,
-        adc::SAMPLES_PER_SEC_RAW_X10 / 10,
-        adc::SAMPLES_PER_SEC_RAW_X10 % 10,
-        adc::SAMPLES_PER_SEC_PROCESSED_X10 / 10,
-        adc::SAMPLES_PER_SEC_PROCESSED_X10 % 10,
+        adc::SAMPLES_PER_SEC_RAW_X100 / 100,
+        adc::SAMPLES_PER_SEC_RAW_X100 % 100,
+        adc::SAMPLES_PER_SEC_PROCESSED_X100 / 100,
+        adc::SAMPLES_PER_SEC_PROCESSED_X100 % 100,
         adc::BUFFERS_PER_SEC,
         adc::BUF_LEN_RAW,
         adc::BUF_LEN_PROCESSED,
@@ -104,13 +104,14 @@ pub mod clk {
 // Prolog for clock config:
 //
 //   :- use_module(library(clpfd)).
-//   sampleFreq(SYSCLK, AHB_PRE, APB2_PRE, ADC_PRE, ADC_SAMPLE_x10, FREQ) :-
+//   sampleFreq(SYSCLK, AHB_PRE, APB2_PRE, ADC_PRE, ADC_SAMPLE_x10_UNADJUSTED, FREQ) :-
 //     SYSCLK #> 0,
 //     AHB_PRE #>= 1,
 //     AHB_PRE #=< 512,
 //     member(APB2_PRE, [1, 2, 4, 8, 16]),
 //     member(ADC_PRE, [2, 4, 6, 8]),
-//     member(ADC_SAMPLE_x10, [15, 75, 135, 285, 415, 555, 715, 2395]),
+//     member(ADC_SAMPLE_x10_UNADJUSTED, [15, 75, 135, 285, 415, 555, 715, 2395]),
+//     ADC_SAMPLE_x10 #= ADC_SAMPLE_x10_UNADJUSTED + 125,
 //     ADCCLK #= SYSCLK // AHB_PRE // APB2_PRE // ADC_PRE,
 //     ADCCLK #>= 600000,
 //     ADCCLK #=< 14000000,
@@ -131,9 +132,9 @@ pub mod adc {
     /// ADC averages 1 samples for each data point
     pub const OVERSAMPLE: usize = 1;
 
-    /// Sample at ADCCLK / 55.5 = 40540 Hz (~20kHz per channel)
-    const SAMPLE_CYC_X10: usize = 555;
-    pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10 {
+    /// Sample at ADCCLK / this
+    const SAMPLE_CYC_X10_UNADJUSTED: usize = 555;
+    pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10_UNADJUSTED {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
         135 => SampleTime::T_13,
@@ -144,13 +145,16 @@ pub mod adc {
         2395 => SampleTime::T_239,
         _ => panic!("Invalid sample cycles"),
     };
+    /// The _real_ sample rate, including an additional 12.5 cycles for successive approximation
+    /// See ADC characteristics in https://www.st.com/resource/en/datasheet/stm32f103c8.pdf
+    const SAMPLE_CYC_X10: usize = SAMPLE_CYC_X10_UNADJUSTED + 125;
 
     /// Number of raw ADC samples, per second (both channels, oversampled)
-    pub(super) const SAMPLES_PER_SEC_RAW_X10: usize =
-        10 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
+    pub(super) const SAMPLES_PER_SEC_RAW_X100: usize =
+        100 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
 
-    pub(super) const SAMPLES_PER_SEC_PROCESSED_X10: usize =
-        SAMPLES_PER_SEC_RAW_X10 / CHANNELS / OVERSAMPLE;
+    pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize =
+        SAMPLES_PER_SEC_RAW_X100 / CHANNELS / OVERSAMPLE;
 
     /// Swap buffers ~32 times per second
     /// Note that 1/32 notes (semidemiquavers) at 60 bpm are 1/8 second
@@ -161,7 +165,7 @@ pub mod adc {
     /// Note: this may not result in a perfect number of buffers per second,
     /// since it is unlikely that the sample rate is evenly divisible.
     pub const BUF_LEN_RAW: usize = {
-        let approx_len = SAMPLES_PER_SEC_RAW_X10 / BUFFERS_PER_SEC / 10;
+        let approx_len = SAMPLES_PER_SEC_RAW_X100 / BUFFERS_PER_SEC / 100;
         // make divisible by CHANNELS and OVERSAMPLE so processed buffer fits in perfectly
         let remainder = approx_len % (CHANNELS * OVERSAMPLE);
         approx_len - remainder
@@ -226,7 +230,7 @@ pub mod fft {
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        100 * config::adc::SAMPLES_PER_SEC_PROCESSED_X10 / BUF_LEN_REAL;
+        10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
 
     pub mod analysis {
         /// Maximum number of peaks to find in the FFT spectrum
