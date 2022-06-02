@@ -26,7 +26,7 @@ pub fn dump_to_log() {
         - WINDOW: {}\n\
         - BUF_LEN_REAL:    {}\n\
         - BUF_LEN_COMPLEX: {}\n\
-        - FREQ_RESOLUTION: {}.{} Hz\n\
+        - FREQ_RESOLUTION: {}.{} Hz (max {}.{} Hz)\n\
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
         - AMPLITUDE_THRESHOLD: {}\n\
@@ -57,6 +57,8 @@ pub fn dump_to_log() {
         fft::BUF_LEN_COMPLEX,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
+        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 / 1000,
+        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
         fft::analysis::MAX_PEAKS,
         fft::analysis::AMPLITUDE_THRESHOLD,
     );
