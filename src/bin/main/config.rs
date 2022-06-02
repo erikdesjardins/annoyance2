@@ -224,7 +224,7 @@ pub mod fft {
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
-        100 * config::adc::SAMPLES_PER_SEC_PROCESSED_X10 / BUF_LEN_COMPLEX;
+        100 * config::adc::SAMPLES_PER_SEC_PROCESSED_X10 / BUF_LEN_REAL;
 
     pub mod analysis {
         /// Maximum number of peaks to find in the FFT spectrum
