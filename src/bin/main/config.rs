@@ -147,11 +147,11 @@ pub mod adc {
     };
     /// The _real_ sample rate, including an additional 12.5 cycles for successive approximation
     /// See ADC characteristics in https://www.st.com/resource/en/datasheet/stm32f103c8.pdf
-    const SAMPLE_CYC_X10: usize = SAMPLE_CYC_X10_UNADJUSTED + 125;
+    const SAMPLE_CYC: usize = (SAMPLE_CYC_X10_UNADJUSTED + 125) / 10;
 
     /// Number of raw ADC samples, per second (both channels, oversampled)
     pub(super) const SAMPLES_PER_SEC_RAW_X100: usize =
-        100 * config::clk::ADCCLK.to_Hz() as usize * 10 / SAMPLE_CYC_X10;
+        100 * config::clk::ADCCLK.to_Hz() as usize / SAMPLE_CYC;
 
     pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize =
         SAMPLES_PER_SEC_RAW_X100 / CHANNELS / OVERSAMPLE;
