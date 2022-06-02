@@ -27,6 +27,7 @@ https://probe.rs/docs/getting-started/probe-setup/
 ### Run on device
 
 ```sh
+# use `debug` or `trace` for more info
 set DEFMT_LOG=info
 cargo watch --clear --delay 1 --exec "run --bin main"
 ```
