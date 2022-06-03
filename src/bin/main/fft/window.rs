@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::scale_by;
+use crate::math::ScaleBy;
 
 // put in RAM: ~100us improvement
 // #[link_section = ".data.adc::window::HAMMING"]
@@ -26,6 +26,6 @@ pub fn apply_to(data: &mut [i16; config::adc::BUF_LEN_PROCESSED]) {
     assert_eq!(data.len(), window.len());
 
     for (x, scale) in data.iter_mut().zip(window) {
-        *x = scale_by(*x, scale);
+        *x = x.scale_by(scale);
     }
 }

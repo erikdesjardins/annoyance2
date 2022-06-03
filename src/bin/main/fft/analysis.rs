@@ -1,6 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude_sqrt, amplitude_squared, phase, scale_by};
-use crate::num::{DivRound, Truncate};
+use crate::math::{amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, Truncate};
 use crate::panic::OptionalExt;
 use num_complex::Complex;
 
@@ -204,7 +203,7 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
             let peak = &peaks[i_peak];
             let bin = bins[peak.i];
             let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
-            let deg_at_max = scale_by(360, phase(bin));
+            let deg_at_max = 360.scale_by(phase(bin));
 
             let peak_freq = peak_freqs[i_peak];
             let center_freq = i_to_freq(peak.i);

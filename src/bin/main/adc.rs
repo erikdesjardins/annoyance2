@@ -1,6 +1,5 @@
 use crate::config;
-use crate::fixed::scale_by;
-use crate::num::{DivRound, Truncate};
+use crate::math::{const_scale_by_i16_u16, DivRound, Truncate};
 use crate::panic::OptionalExt;
 
 #[inline(never)]
@@ -57,7 +56,7 @@ static FAKE_COS_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
         let frequency = i * config::debug::FAKE_INPUT_CYCLES_PER_BUF;
         let phase = config::debug::FAKE_INPUT_PHASE * LEN / u16::MAX as usize;
         let unscaled_sample = COS_TABLE[(frequency + phase) % LEN];
-        fake[i] = scale_by(unscaled_sample, config::debug::FAKE_INPUT_AMPLITUDE);
+        fake[i] = const_scale_by_i16_u16(unscaled_sample, config::debug::FAKE_INPUT_AMPLITUDE);
         i += 1;
     }
 

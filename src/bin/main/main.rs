@@ -18,8 +18,7 @@ use annoyance2 as _; // global logger + panicking-behavior + memory layout
 mod adc;
 mod config;
 mod fft;
-mod fixed;
-mod num;
+mod math;
 mod panic;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [USART1])]

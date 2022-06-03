@@ -1,5 +1,5 @@
 use crate::config;
-use crate::fixed::{amplitude_sqrt, amplitude_squared};
+use crate::math::{amplitude_sqrt, amplitude_squared};
 use crate::panic::OptionalExt;
 use core::mem;
 use num_complex::Complex;
