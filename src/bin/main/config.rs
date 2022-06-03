@@ -7,6 +7,7 @@ pub fn dump_to_log() {
         - FAKE_INPUT_AMPLITUDE:      {}\n\
         - LOG_LAST_FEW_SAMPLES: {}\n\
         - LOG_LAST_N_SAMPLES:   {}\n\
+        - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_FFT_AMPLITUDES: {}\n\
         Clocks:\n\
         - HSE_FREQ: {} Hz\n\
@@ -37,6 +38,7 @@ pub fn dump_to_log() {
         debug::FAKE_INPUT_AMPLITUDE,
         debug::LOG_LAST_FEW_SAMPLES,
         debug::LOG_LAST_N_SAMPLES,
+        debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_FFT_AMPLITUDES,
         clk::HSE_FREQ.to_Hz(),
         clk::SYSCLK.to_Hz(),

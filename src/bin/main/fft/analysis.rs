@@ -197,26 +197,30 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
 
     // Phase 3: log peaks
 
-    for i_peak in 0..peaks.len() {
-        let peak = &peaks[i_peak];
-        let bin = bins[peak.i];
-        let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
-        let deg_at_max = scale_by(360, phase(bin));
+    // Phase 4: log peaks
 
-        let peak_freq = peak_freqs[i_peak];
-        let center_freq = i_to_freq(peak.i);
-        let left_freq = i_to_freq(peak.left);
-        let right_freq = i_to_freq(peak.right);
+    if config::debug::LOG_FFT_PEAKS {
+        for i_peak in 0..peaks.len() {
+            let peak = &peaks[i_peak];
+            let bin = bins[peak.i];
+            let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
+            let deg_at_max = scale_by(360, phase(bin));
 
-        defmt::info!(
-            "Peak amplitude = {} @ freq = {} (mid {}, lo {}, hi {}) Hz, phase = {} deg",
-            max_amplitude,
-            peak_freq,
-            center_freq,
-            left_freq,
-            right_freq,
-            deg_at_max,
-        );
+            let peak_freq = peak_freqs[i_peak];
+            let center_freq = i_to_freq(peak.i);
+            let left_freq = i_to_freq(peak.left);
+            let right_freq = i_to_freq(peak.right);
+
+            defmt::println!(
+                "Peak amplitude = {} @ freq = {} (mid {}, lo {}, hi {}) Hz, phase = {} deg",
+                max_amplitude,
+                peak_freq,
+                center_freq,
+                left_freq,
+                right_freq,
+                deg_at_max,
+            );
+        }
     }
 }
 
