@@ -33,6 +33,7 @@ pub fn dump_to_log() {
         - AMPLITUDE_THRESHOLD: {}\n\
         Pulse generation:\n\
         - DURATION: {}.{} us\n\
+        - SCHEDULING_OFFSET: {}.{} us\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -67,6 +68,8 @@ pub fn dump_to_log() {
         fft::analysis::AMPLITUDE_THRESHOLD,
         pulse::DURATION.to_nanos() / 1000,
         pulse::DURATION.to_nanos() % 1000,
+        pulse::SCHEDULING_OFFSET.to_nanos() / 1000,
+        pulse::SCHEDULING_OFFSET.to_nanos() % 1000,
     );
 }
 
@@ -276,4 +279,13 @@ pub mod pulse {
     /// Pulse duration
     pub const DURATION: Duration<u32, 1, { config::clk::TIM1CLK_HZ }> =
         Duration::<u32, 1, { config::clk::TIM1CLK_HZ }>::micros(1);
+
+    /// Start scheduling pulses this far in the future.
+    ///
+    /// This ensures that we don't try to schedule a pulse, e.g., just 1 tick after the current time,
+    /// causing us to miss the deadline (and wait until the timer wraps).
+    ///
+    /// It also provides a minimum repeat rate, for the same reason.
+    pub const SCHEDULING_OFFSET: Duration<u32, 1, { config::clk::SYSCLK_HZ }> =
+        Duration::<u32, 1, { config::clk::SYSCLK_HZ }>::micros(10);
 }
