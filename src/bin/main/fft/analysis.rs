@@ -1,12 +1,17 @@
 use crate::config;
 use crate::math::{amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, Truncate};
 use crate::panic::OptionalExt;
+use fugit::{Duration, Hertz, RateExtU32};
+use heapless::Vec;
 use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
 
 #[inline(never)]
-pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
+pub fn find_peaks(
+    bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2],
+    peaks_out: &mut Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
+) {
     struct PeakLoc {
         /// Index of highest point in the peak
         i: usize,
@@ -194,7 +199,17 @@ pub fn find_peaks(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2]) {
         peak_freqs[i_peak] = real_freq;
     }
 
-    // Phase 3: log peaks
+    // Phase 3: store peaks
+
+    assert!(peaks_out.capacity() == config::fft::analysis::MAX_PEAKS);
+    assert!(peaks_out.capacity() >= peaks.len());
+    peaks_out.clear();
+    peaks_out.extend((0..peaks.len()).map(|i_peak| {
+        let peak = &peaks[i_peak];
+        let bin = bins[peak.i];
+        let peak_freq = peak_freqs[i_peak];
+        Peak::from_bin_and_freq(bin, peak_freq)
+    }));
 
     // Phase 4: log peaks
 
@@ -228,4 +243,41 @@ fn i_to_freq(i: usize) -> u16 {
     // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
     let freq: u16 = freq.truncate();
     freq
+}
+
+/// Represents one peak frequency from the FFT, with frequency and scale factor
+pub struct Peak {
+    amplitude: u16,
+    freq: u16,
+    phase_scale_factor: u16,
+}
+
+impl Peak {
+    fn from_bin_and_freq(bin: Complex<i16>, freq: u16) -> Self {
+        let amplitude = amplitude_sqrt(amplitude_squared(bin));
+        let phase_scale_factor = phase(bin);
+        Self {
+            amplitude,
+            freq,
+            phase_scale_factor,
+        }
+    }
+
+    pub fn amplitude(&self) -> u16 {
+        self.amplitude
+    }
+
+    pub fn freq(&self) -> Hertz<u32> {
+        u32::from(self.freq).Hz()
+    }
+
+    pub fn period<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {
+        self.freq().into_duration()
+    }
+
+    pub fn phase_offset<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {
+        let period_ticks = self.period::<DENOM>().ticks();
+        let phase_offset_ticks = period_ticks.scale_by(self.phase_scale_factor);
+        Duration::<u32, 1, DENOM>::from_ticks(phase_offset_ticks)
+    }
 }

@@ -25,6 +25,7 @@ dependencies = [
  "fixed",
  "fixed-sqrt",
  "fugit",
+ "heapless",
  "num-complex",
  "panic-probe",
  "stm32f1xx-hal",

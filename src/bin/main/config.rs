@@ -31,6 +31,8 @@ pub fn dump_to_log() {
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
         - AMPLITUDE_THRESHOLD: {}\n\
+        Pulse generation:\n\
+        - DURATION: {}.{} us\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -63,6 +65,8 @@ pub fn dump_to_log() {
         fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
         fft::analysis::MAX_PEAKS,
         fft::analysis::AMPLITUDE_THRESHOLD,
+        pulse::DURATION.to_nanos() / 1000,
+        pulse::DURATION.to_nanos() % 1000,
     );
 }
 
@@ -79,28 +83,48 @@ pub mod debug;
 ///                           -> APB2 prescaler -> PCLK2
 ///                               / 1,2,4,8,16  |
 ///                                             |
+///                                             -> TIM1 prescaler -> TIM1
+///                                             |   if APB2_pre == 1 { 1 } else { 2 }
+///                                             |
 ///                                             -> ADC prescaler -> ADCCLK
 ///                                                 / 2,4,6,8
 pub mod clk {
-    use fugit::Rate;
+    use fugit::Hertz;
 
     /// Use external oscillator (required to get max 72MHz sysclk)
-    pub const HSE_FREQ: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(8);
+    pub const HSE_FREQ: Hertz<u32> = Hertz::<u32>::MHz(8);
 
     /// PLLMUL @ x9 (max 72MHz)
-    pub const SYSCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(72);
+    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(72);
+    pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
     /// APB1 prescaler @ /8 (max 36MHz)
-    pub const PCLK1: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(9);
+    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(9);
     /// APB2 prescaler @ /8 (max 72MHz)
-    pub const PCLK2: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::MHz(9);
+    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(9);
+
+    /// TIM1 prescaler @ /1
+    pub const TIM1CLK: Hertz<u32> = {
+        // only accurate if AHB prescaler = 1
+        let apb2_prescaler_is_1 = PCLK2.const_eq(SYSCLK);
+        if apb2_prescaler_is_1 {
+            PCLK2
+        } else {
+            // * 2
+            match PCLK2.checked_add(PCLK2) {
+                Some(clk) => clk,
+                None => panic!("overflow doubling PCLK2"),
+            }
+        }
+    };
+    pub const TIM1CLK_HZ: u32 = TIM1CLK.to_Hz();
 
     // For adc, want slow enough to sample audio, but fast enough that register writes are acknowledged fast (?)
 
     /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Rate<u32, 1, 1> = Rate::<u32, 1, 1>::kHz(4500);
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(4500);
 }
 
 // Prolog for clock config:
@@ -242,4 +266,14 @@ pub mod fft {
         pub(in crate::config) const AMPLITUDE_THRESHOLD: u16 = 50;
         pub const AMPLITUDE_THRESHOLD_SQUARED: u32 = (AMPLITUDE_THRESHOLD as u32).pow(2);
     }
+}
+
+/// Pulse generation configuration
+pub mod pulse {
+    use crate::config;
+    use fugit::Duration;
+
+    /// Pulse duration
+    pub const DURATION: Duration<u32, 1, { config::clk::TIM1CLK_HZ }> =
+        Duration::<u32, 1, { config::clk::TIM1CLK_HZ }>::micros(1);
 }
