@@ -40,7 +40,7 @@ mod app {
     use crate::panic::OptionalExt;
     use crate::pulse;
     use crate::pulse::{Pulses, UnadjustedPulses};
-    use crate::time::Instant;
+    use crate::time::{Duration, Instant};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use heapless::Vec;
@@ -224,6 +224,12 @@ mod app {
 
             // fire timer
             cx.local.pulse_timer.reset_and_fire();
+            if config::debug::LOG_ALL_PULSES {
+                defmt::println!(
+                    "Firing pulse at {}us",
+                    Duration::from_ticks(now.ticks()).to_micros()
+                );
+            }
 
             // reschedule ourselves for the next pulse
             if let Some(next_pulse) = pulses.next_pulse(now) {

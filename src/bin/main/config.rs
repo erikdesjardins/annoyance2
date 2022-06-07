@@ -9,6 +9,7 @@ pub fn dump_to_log() {
         - LOG_LAST_N_SAMPLES:   {}\n\
         - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_FFT_AMPLITUDES: {}\n\
+        - LOG_ALL_PULSES: {}\n\
         Clocks:\n\
         - HSE_FREQ: {} Hz\n\
         - SYSCLK:   {} Hz\n\
@@ -43,6 +44,7 @@ pub fn dump_to_log() {
         debug::LOG_LAST_N_SAMPLES,
         debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_FFT_AMPLITUDES,
+        debug::LOG_ALL_PULSES,
         clk::HSE_FREQ.to_Hz(),
         clk::SYSCLK.to_Hz(),
         clk::PCLK1.to_Hz(),
