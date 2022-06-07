@@ -1,3 +1,4 @@
+use crate::collections::ReplaceWithMapped;
 use crate::config;
 use crate::math::{amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, Truncate};
 use crate::panic::OptionalExt;
@@ -19,16 +20,11 @@ pub fn find_peaks(
         left: usize,
         /// Rightmost index of peak, inclusive (samples monotonically decrease from highest point to here)
         right: usize,
+        /// Real frequency at the peak, adjusted based on nearby samples
+        freq: u16,
     }
 
-    const ZERO_PEAK: PeakLoc = PeakLoc {
-        i: 0,
-        left: 0,
-        right: 0,
-    };
-
-    let mut peaks = [ZERO_PEAK; config::fft::analysis::MAX_PEAKS];
-    let mut actual_peaks = 0;
+    let mut peaks: Vec<PeakLoc, { config::fft::analysis::MAX_PEAKS }> = Vec::new();
 
     // Phase 1: find locations of peaks
     //
@@ -44,7 +40,7 @@ pub fn find_peaks(
     // ...           ...... ...
     //
 
-    'next_peak: for i_peak in 0..peaks.len() {
+    'next_peak: for _ in 0..peaks.capacity() {
         // Step 1: find highest point outside an existing peak
         let mut max_amplitude_squared = 0;
         let mut i_at_max = 0;
@@ -55,7 +51,7 @@ pub fn find_peaks(
                 continue 'next_bin;
             }
             // if this is already inside an existing peak, continue
-            for peak in &peaks[..i_peak] {
+            for peak in &peaks {
                 if i >= peak.left && i <= peak.right {
                     continue 'next_bin;
                 }
@@ -101,13 +97,16 @@ pub fn find_peaks(
         }
 
         // Step 4: store valid peak
-        peaks[i_peak].i = i_at_max;
-        peaks[i_peak].left = left;
-        peaks[i_peak].right = right;
-        actual_peaks = i_peak + 1;
+        peaks
+            .push(PeakLoc {
+                i: i_at_max,
+                left,
+                right,
+                // computed in the next step
+                freq: 0,
+            })
+            .unwrap_or_else(|_| panic!("too many peaks found (impossible)"));
     }
-
-    let peaks = &peaks[..actual_peaks];
 
     // Phase 2: refine the peak frequency based on shape of the peak
     //
@@ -144,11 +143,7 @@ pub fn find_peaks(
     // | .
     // +----->
 
-    let mut peak_freqs = [0; config::fft::analysis::MAX_PEAKS];
-
-    for i_peak in 0..peaks.len() {
-        let peak = &peaks[i_peak];
-
+    for peak in &mut peaks {
         // Step 1: compute amplitudes
         let center = amplitude_sqrt(amplitude_squared(bins[peak.i]));
         let sides = [peak.i - 1, peak.i + 1].map(|i| match bins.get(i) {
@@ -196,31 +191,24 @@ pub fn find_peaks(
         let real_freq: u16 = real_freq.truncate();
 
         // Step 6: store adjusted frequency
-        peak_freqs[i_peak] = real_freq;
+        peak.freq = real_freq;
     }
 
     // Phase 3: store peaks
 
-    assert!(peaks_out.capacity() == config::fft::analysis::MAX_PEAKS);
-    assert!(peaks_out.capacity() >= peaks.len());
-    peaks_out.clear();
-    peaks_out.extend((0..peaks.len()).map(|i_peak| {
-        let peak = &peaks[i_peak];
-        let bin = bins[peak.i];
-        let peak_freq = peak_freqs[i_peak];
-        Peak::from_bin_and_freq(bin, peak_freq)
-    }));
+    peaks_out.replace_with_mapped(&peaks, |peak| {
+        Peak::from_bin_and_freq(bins[peak.i], peak.freq)
+    });
 
     // Phase 4: log peaks
 
     if config::debug::LOG_FFT_PEAKS {
-        for i_peak in 0..peaks.len() {
-            let peak = &peaks[i_peak];
+        for peak in &peaks {
             let bin = bins[peak.i];
             let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
             let deg_at_max = 360.scale_by(phase(bin));
 
-            let peak_freq = peak_freqs[i_peak];
+            let peak_freq = peak.freq;
             let center_freq = i_to_freq(peak.i);
             let left_freq = i_to_freq(peak.left);
             let right_freq = i_to_freq(peak.right);

@@ -16,6 +16,7 @@
 use annoyance2 as _; // global logger + panicking-behavior + memory layout
 
 mod adc;
+mod collections;
 mod config;
 mod fft;
 mod hal;

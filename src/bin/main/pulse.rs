@@ -1,3 +1,4 @@
+use crate::collections::ReplaceWithMapped;
 use crate::config;
 use crate::fft::analysis::Peak;
 use crate::time::{Duration, Instant};
@@ -9,16 +10,14 @@ pub fn schedule_pulses(
     now: Instant,
     pulses_out: &mut Pulses,
 ) {
-    assert!(pulses_out.pulses.capacity() == peaks.capacity());
-    pulses_out.pulses.clear();
-    pulses_out.pulses.extend(peaks.iter().map(|peak| {
+    pulses_out.pulses.replace_with_mapped(peaks, |peak| {
         let period = peak.freq().into_duration();
         let phase_offset = peak.phase_offset();
         Pulse {
             period,
             next: now + phase_offset + period,
         }
-    }));
+    });
 }
 
 pub struct Pulses {
