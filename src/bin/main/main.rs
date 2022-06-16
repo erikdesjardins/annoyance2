@@ -3,6 +3,7 @@
 #![allow(
     clippy::assertions_on_constants,
     clippy::needless_range_loop,
+    clippy::redundant_pattern_matching,
     clippy::type_complexity
 )]
 #![warn(
@@ -279,7 +280,7 @@ mod app {
 
         // Step 1: adjust pulses and swap
         let next_pulse = cx.shared.pulses.lock(|pulses| {
-            pulses.replace_with_adjusted(&cx.local.next_pulses, start);
+            pulses.replace_with_adjusted(cx.local.next_pulses, start);
             pulses.next_pulse(start)
         });
 
