@@ -176,6 +176,10 @@ pub fn find_peaks(
         // in which case the frequency should be scaled by 2/4 * (1/2 * resolution)
         let center: usize = center.try_into().unwrap_infallible();
         let large_side: usize = large_side.try_into().unwrap_infallible();
+        // offset to ensure we don't divide by 0 if center would be at 0
+        let offset = 1;
+        let center = center + offset;
+        let large_side = large_side + offset;
         // adjustment = large_side/center * 1/2 * resolution
         let adjustment_x1000 = large_side * config::fft::FREQ_RESOLUTION_X1000 / center / 2;
 
