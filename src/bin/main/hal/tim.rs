@@ -67,9 +67,10 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
         if PINS::C1 {
             self.tim.ccmr1_output().modify(|_, w| {
                 w
-                    // set output control mode
+                    // enable preload on CCR
                     .oc1pe()
                     .set_bit()
+                    // set output control mode
                     .oc1m()
                     .bits(mode as _)
                     // enable fast enable (do not wait for CCR comparison)
@@ -80,35 +81,33 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
             });
             // CCR must be > 0, but is otherwise ignored here due to fast enable
             self.tim.ccr1.write(|w| w.ccr().bits(1));
+            // Enable the capture/compare channel
+            self.tim.ccer.modify(|_, w| w.cc1e().set_bit());
         }
         if PINS::C2 {
             self.tim
                 .ccmr1_output()
                 .modify(|_, w| w.oc2pe().set_bit().oc2m().bits(mode as _).oc2fe().set_bit());
             self.tim.ccr2.write(|w| w.ccr().bits(1));
+            self.tim.ccer.modify(|_, w| w.cc2e().set_bit());
         }
         if PINS::C3 {
             self.tim
                 .ccmr2_output()
                 .modify(|_, w| w.oc3pe().set_bit().oc3m().bits(mode as _).oc3fe().set_bit());
             self.tim.ccr3.write(|w| w.ccr().bits(1));
+            self.tim.ccer.modify(|_, w| w.cc3e().set_bit());
         }
         if PINS::C4 {
             self.tim
                 .ccmr2_output()
                 .modify(|_, w| w.oc4pe().set_bit().oc4m().bits(mode as _).oc4fe().set_bit());
             self.tim.ccr4.write(|w| w.ccr().bits(1));
+            self.tim.ccer.modify(|_, w| w.cc4e().set_bit());
         }
 
-        self.tim.cr1.modify(|_, w| {
-            w
-                // enable preload for ARR
-                .arpe()
-                .set_bit()
-                // enable one pulse mode
-                .opm()
-                .set_bit()
-        });
+        // Enable preload for ARR
+        self.tim.cr1.modify(|_, w| w.arpe().bit(true));
 
         // time is ARR - CCR + 1, so subtract 1 tick
         // (note that CCR is effectively 0 here due to fast enable)
@@ -126,6 +125,9 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
         self.tim.egr.write(|w| w.ug().set_bit());
         self.tim.cr1.modify(|_, w| w.urs().clear_bit());
 
+        // Set automatic output enable (for TIM1 only)
+        self.tim.bdtr.modify(|_, w| w.aoe().set_bit());
+
         OnePulse {
             timer: self,
             _pins: PhantomData,
@@ -139,6 +141,10 @@ where
     PINS: Pins<REMAP, P>,
 {
     pub fn reset_and_fire(&mut self) {
-        self.timer.tim.cr1.write(|w| w.cen().set_bit());
+        // enable one pulse mode and start the timer
+        self.timer
+            .tim
+            .cr1
+            .write(|w| w.opm().set_bit().cen().set_bit());
     }
 }
