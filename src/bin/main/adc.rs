@@ -7,28 +7,24 @@ pub fn process_raw_samples(
     input: &[u16; config::adc::BUF_LEN_RAW],
     output: &mut [i16; config::adc::BUF_LEN_PROCESSED],
 ) {
-    // convert unsigned differential samples (centered individually at Vcc/2) to signed samples (centered at 0)
-    assert_eq!(output.len() * 2 * config::adc::OVERSAMPLE, input.len());
+    // convert unsigned samples (centered at Vcc/2) to signed samples (centered at 0)
+    assert_eq!(output.len() * config::adc::OVERSAMPLE, input.len());
 
     for (value, samples) in output
         .iter_mut()
-        .zip(input.chunks_exact(2 * config::adc::OVERSAMPLE))
+        .zip(input.chunks_exact(config::adc::OVERSAMPLE))
     {
-        // sum up oversampled channels
-        let mut channel_a: i32 = 0;
-        let mut channel_b: i32 = 0;
-        for channels in samples.chunks_exact(2) {
-            channel_a += i32::from(channels[0]);
-            channel_b += i32::from(channels[1]);
-        }
-        // subtract groups of samples
-        let difference = channel_b - channel_a;
-        // scale down difference by oversample ratio, rounded
+        // sum up oversampled samples
+        let sample: i32 = samples.iter().copied().map(i32::from).sum();
+        // scale down sum by oversample ratio, rounded
         let oversample: i32 = config::adc::OVERSAMPLE.try_into().unwrap_infallible();
-        let difference: i32 = difference.div_round(oversample);
-        // truncate difference, which should fit because ADC only has 12 bits of resolution (hence max difference is 2^12)
-        let difference: i16 = difference.truncate();
-        *value = difference;
+        let sample: i32 = sample.div_round(oversample);
+        // subtract Vcc/2 offset
+        let offset: i32 = (1 << config::adc::RESOLUTION_BITS) / 2;
+        let sample: i32 = sample - offset;
+        // truncate sum, which should fit into i16 because ADC only has 12 bits of resolution
+        let sample: i16 = sample.truncate();
+        *value = sample;
     }
 
     if config::debug::FAKE_INPUT_DATA {

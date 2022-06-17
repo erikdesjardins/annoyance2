@@ -37,7 +37,6 @@ mod app {
     use crate::fft;
     use crate::hal::pins;
     use crate::hal::tim::{OnePulse, OneshotTimer};
-    use crate::hal::AdcPins;
     use crate::panic::OptionalExt;
     use crate::pulse;
     use crate::pulse::{Pulses, UnadjustedPulses};
@@ -45,12 +44,12 @@ mod app {
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use heapless::Vec;
-    use stm32f1xx_hal::adc::{Adc, AdcDma, Scan};
+    use stm32f1xx_hal::adc::{Adc, AdcDma, Continuous};
     use stm32f1xx_hal::device::{ADC1, TIM1};
     use stm32f1xx_hal::dma::{dma1, CircBuffer, Event};
     use stm32f1xx_hal::gpio::PinState;
     use stm32f1xx_hal::prelude::*;
-    use stm32f1xx_hal::timer::{Ch, Tim1NoRemap, Tim2NoRemap};
+    use stm32f1xx_hal::timer::{Ch, Tim1NoRemap};
 
     #[shared]
     struct Shared {
@@ -59,8 +58,10 @@ mod app {
 
     #[local]
     struct Local {
-        adc_dma_transfer:
-            CircBuffer<[u16; config::adc::BUF_LEN_RAW], AdcDma<ADC1, AdcPins, Scan, dma1::C1>>,
+        adc_dma_transfer: CircBuffer<
+            [u16; config::adc::BUF_LEN_RAW],
+            AdcDma<ADC1, pins::A0_ADC1C0, Continuous, dma1::C1>,
+        >,
         fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
         next_pulses: &'static mut UnadjustedPulses,
         pulse_timer:
@@ -110,21 +111,8 @@ mod app {
         adc1.set_sample_time(config::adc::SAMPLE);
 
         let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
-        let adc_ch1: pins::A4_ADC1C4 = gpioa.pa4.into_analog(&mut gpioa.crl);
 
-        let adc_dma = adc1.with_scan_dma(AdcPins(adc_ch0, adc_ch1), dma1_ch1);
-
-        defmt::info!("Configuring PWM virtual ground...");
-
-        let tim2_ch3: pins::A2_PWM_VIRT_GND = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
-
-        let mut pwm = cx
-            .device
-            .TIM2
-            .pwm_hz::<Tim2NoRemap, _, _>(tim2_ch3, &mut afio.mapr, config::clk::PCLK1, &clocks)
-            .split();
-        pwm.set_duty(pwm.get_max_duty() / 2);
-        pwm.enable();
+        let adc_dma = adc1.with_dma(adc_ch0, dma1_ch1);
 
         defmt::info!("Configuring pulse output timer...");
 

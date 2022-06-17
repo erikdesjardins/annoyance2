@@ -17,13 +17,13 @@ pub fn dump_to_log() {
         - PCLK2:    {} Hz\n\
         - ADCCLK:   {} Hz\n\
         ADC:\n\
-        - CHANNELS: {}\n\
+        - RESOLUTION_BITS: {} (max amplitude {})\n\
         - OVERSAMPLE: {}\n\
-        - SAMPLES_PER_SEC_RAW:       {}.{} (all channels, oversampled)\n\
-        - SAMPLES_PER_SEC_PROCESSED: {}.{} (one channel)\n\
+        - SAMPLES_PER_SEC_RAW:       {}.{} (oversampled)\n\
+        - SAMPLES_PER_SEC_PROCESSED: {}.{}\n\
         - BUFFERS_PER_SEC: {}\n\
-        - BUF_LEN_RAW:       {} (all channels, oversampled)\n\
-        - BUF_LEN_PROCESSED: {} (one channel)\n\
+        - BUF_LEN_RAW:       {} (oversampled)\n\
+        - BUF_LEN_PROCESSED: {}\n\
         FFT:\n\
         - WINDOW: {}\n\
         - BUF_LEN_REAL:    {}\n\
@@ -50,7 +50,8 @@ pub fn dump_to_log() {
         clk::PCLK1.to_Hz(),
         clk::PCLK2.to_Hz(),
         clk::ADCCLK.to_Hz(),
-        adc::CHANNELS,
+        adc::RESOLUTION_BITS,
+        1 << adc::RESOLUTION_BITS,
         adc::OVERSAMPLE,
         adc::SAMPLES_PER_SEC_RAW_X100 / 100,
         adc::SAMPLES_PER_SEC_RAW_X100 % 100,
@@ -128,8 +129,8 @@ pub mod clk {
 
     // For adc, want slow enough to sample audio, but fast enough that register writes are acknowledged fast (?)
 
-    /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(4500);
+    /// ADC prescaler @ /4 (max 14MHz, min 600kHz)
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(2250);
 }
 
 // Prolog for clock config:
@@ -157,8 +158,8 @@ pub mod adc {
     use crate::config;
     use stm32f1xx_hal::adc::SampleTime;
 
-    /// ADC scans two channels for differential input
-    pub const CHANNELS: usize = 2;
+    /// The resolution of the hardware ADC being used.
+    pub const RESOLUTION_BITS: u16 = 12;
 
     /// ADC averages x samples for each data point
     pub const OVERSAMPLE: usize = 2;
@@ -180,12 +181,11 @@ pub mod adc {
     /// See ADC characteristics in https://www.st.com/resource/en/datasheet/stm32f103c8.pdf
     const SAMPLE_CYC: usize = (SAMPLE_CYC_X10_UNADJUSTED + 125) / 10;
 
-    /// Number of raw ADC samples, per second (both channels, oversampled)
+    /// Number of raw ADC samples, per second (oversampled)
     pub(super) const SAMPLES_PER_SEC_RAW_X100: usize =
         100 * config::clk::ADCCLK.to_Hz() as usize / SAMPLE_CYC;
 
-    pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize =
-        SAMPLES_PER_SEC_RAW_X100 / CHANNELS / OVERSAMPLE;
+    pub(super) const SAMPLES_PER_SEC_PROCESSED_X100: usize = SAMPLES_PER_SEC_RAW_X100 / OVERSAMPLE;
 
     /// Swap buffers ~32 times per second
     /// Note that 1/32 notes (semidemiquavers) at 60 bpm are 1/8 second
@@ -197,16 +197,16 @@ pub mod adc {
     /// since it is unlikely that the sample rate is evenly divisible.
     pub const BUF_LEN_RAW: usize = {
         let approx_len = SAMPLES_PER_SEC_RAW_X100 / BUFFERS_PER_SEC / 100;
-        // make divisible by CHANNELS and OVERSAMPLE so processed buffer fits in perfectly
-        let remainder = approx_len % (CHANNELS * OVERSAMPLE);
+        // make divisible by OVERSAMPLE so processed buffer fits in perfectly
+        let remainder = approx_len % OVERSAMPLE;
         approx_len - remainder
     };
 
     /// Processed, single-ended, averaged samples per buffer.
-    pub const BUF_LEN_PROCESSED: usize = BUF_LEN_RAW / CHANNELS / OVERSAMPLE;
+    pub const BUF_LEN_PROCESSED: usize = BUF_LEN_RAW / OVERSAMPLE;
 
     const _: () = assert!(
-        BUF_LEN_PROCESSED * CHANNELS * OVERSAMPLE == BUF_LEN_RAW,
+        BUF_LEN_PROCESSED * OVERSAMPLE == BUF_LEN_RAW,
         "processed buf len should perfectly divide raw buf len"
     );
 }
