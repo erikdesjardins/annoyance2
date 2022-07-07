@@ -4030,7 +4030,7 @@
     (property "Reference" "R_REF1" (id 0) (at 176.53 86.3599 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "10k" (id 1) (at 176.53 88.8999 0)
+    (property "Value" "" (id 1) (at 176.53 88.8999 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal" (id 2) (at 175.006 87.884 90)
@@ -4185,7 +4185,7 @@
     (property "Reference" "R_REF2" (id 0) (at 176.53 99.0599 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "10k" (id 1) (at 176.53 101.5999 0)
+    (property "Value" "" (id 1) (at 176.53 101.5999 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal" (id 2) (at 175.006 100.584 90)
@@ -4351,10 +4351,10 @@
       (reference "R_OUT_PDN1") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
     )
     (path "/da4c8ffd-925f-4905-ac1e-2dedd0a767c3"
-      (reference "R_REF1") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
+      (reference "R_REF1") (unit 1) (value "100k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
     )
     (path "/f165b5f5-80fa-41b0-a5c3-71abdf337c0f"
-      (reference "R_REF2") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
+      (reference "R_REF2") (unit 1) (value "100k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
     )
     (path "/dca0d87f-e6b7-4b22-b47d-39acfb9e84f3"
       (reference "R_THR1") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal")
