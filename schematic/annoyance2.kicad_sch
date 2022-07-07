@@ -3747,7 +3747,7 @@
     (property "Reference" "RV_C1" (id 0) (at 31.75 173.9899 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "10k" (id 1) (at 31.75 176.5299 0)
+    (property "Value" "" (id 1) (at 31.75 176.5299 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "Custom_Footprints:TRIM_PT01-D125D-B103" (id 2) (at 34.29 175.26 0)
@@ -3809,7 +3809,7 @@
     (property "Reference" "RV_C2" (id 0) (at 49.53 181.6099 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "10k" (id 1) (at 49.53 184.1499 0)
+    (property "Value" "" (id 1) (at 49.53 184.1499 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "Custom_Footprints:TRIM_PT01-D125D-B103" (id 2) (at 52.07 182.88 0)
@@ -4306,10 +4306,10 @@
       (reference "J_MNT4") (unit 1) (value "Conn_01x01_Female") (footprint "MountingHole:MountingHole_3.2mm_M3_Pad")
     )
     (path "/a5dcd80a-dcd4-4db7-8500-a4c472a373f2"
-      (reference "RV_C1") (unit 1) (value "10k") (footprint "Custom_Footprints:TRIM_PT01-D125D-B103")
+      (reference "RV_C1") (unit 1) (value "100k") (footprint "Custom_Footprints:TRIM_PT01-D125D-B103")
     )
     (path "/b55c30fd-f84e-47a6-8924-fa3efab90ede"
-      (reference "RV_C2") (unit 1) (value "10k") (footprint "Custom_Footprints:TRIM_PT01-D125D-B103")
+      (reference "RV_C2") (unit 1) (value "100k") (footprint "Custom_Footprints:TRIM_PT01-D125D-B103")
     )
     (path "/17d99ea5-9c2d-4841-a234-bb502684e3de"
       (reference "RV_G1") (unit 1) (value "10k") (footprint "Custom_Footprints:TRIM_PT01-D130D-A103")
