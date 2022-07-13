@@ -1,0 +1,95 @@
+use crate::config;
+use crate::fft::analysis::Peak;
+use crate::math::Truncate;
+use heapless::Vec;
+
+/// Number of indicators to distribute the scaling factor between
+const N: usize = 4;
+
+/// Compute scaling factors for amplitude indicator, based on raw ADC samples.
+#[inline(never)]
+pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u16; N] {
+    // Step 1: find min and max samples
+
+    let mut min_sample = u16::MAX;
+    let mut max_sample = 0;
+
+    for &sample in input {
+        min_sample = min_sample.min(sample);
+        max_sample = max_sample.max(sample);
+    }
+
+    // Step 2: find the closer of the two maximal samples to clipping
+
+    let max_possible_sample = config::adc::MAX_POSSIBLE_SAMPLE;
+    let min_possible_sample = 0;
+
+    let close_to_max = max_possible_sample - max_sample;
+    let close_to_min = min_sample - min_possible_sample;
+
+    let closest_to_clipping = close_to_max.min(close_to_min);
+
+    // Step 3: compute scale factor in resolution bits
+
+    let overall_scale_factor = max_possible_sample - closest_to_clipping;
+
+    // Step 4: scale up scale factor to full u16 range
+
+    let overall_scale_factor =
+        overall_scale_factor << (u16::BITS - u32::from(config::adc::RESOLUTION_BITS));
+
+    // Step 5: distribute scale factor
+
+    distribute_scale_factor(overall_scale_factor)
+}
+
+/// Compute scaling factors for "above threshold" indicator, based on FFT peaks.
+#[inline(never)]
+pub fn threshold_scaling_factors(
+    peaks: &Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
+) -> [u16; N] {
+    // Step 1: find max peak amplitude
+
+    let max_amplitude = match peaks.iter().map(Peak::amplitude).max() {
+        Some(max) => max,
+        None => return distribute_scale_factor(0),
+    };
+
+    // Step 2: find how far above threshold this amplitude is
+
+    let above_threshold = max_amplitude - config::fft::analysis::AMPLITUDE_THRESHOLD;
+
+    // Step 3: scale up to full u16 range based on max feasible amplitude
+
+    let possible_range_above_threshold =
+        config::fft::MAX_FEASIBLE_AMPLITUDE - config::fft::analysis::AMPLITUDE_THRESHOLD;
+
+    let overall_scale_factor: u32 = u32::from(above_threshold) * u32::from(u16::MAX)
+        / u32::from(possible_range_above_threshold);
+    let overall_scale_factor: u16 = overall_scale_factor.truncate();
+
+    // Step 3: distribute scale factor
+
+    distribute_scale_factor(overall_scale_factor)
+}
+
+/// Split scale factor up into N buckets.
+///
+/// For example, an overall scale factor of 62.5% (5/8) would be distributed over 4 buckets to: 100% 100% 50% 0%.
+fn distribute_scale_factor(overall_scale_factor: u16) -> [u16; N] {
+    let mut factors = [0; N];
+
+    for (i, factor) in factors.iter_mut().enumerate() {
+        let max_factor_over_n: u16 = u16::MAX / N.truncate();
+        let local_factor_over_n: u16 =
+            overall_scale_factor.saturating_sub(i.truncate() * max_factor_over_n);
+        let local_factor: u16 = if local_factor_over_n >= max_factor_over_n {
+            u16::MAX
+        } else {
+            local_factor_over_n * N.truncate()
+        };
+        *factor = local_factor;
+    }
+
+    factors
+}

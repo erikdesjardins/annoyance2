@@ -21,6 +21,7 @@ mod collections;
 mod config;
 mod fft;
 mod hal;
+mod indicator;
 mod math;
 mod panic;
 mod pulse;
@@ -37,6 +38,8 @@ mod app {
     use crate::fft;
     use crate::hal::pins;
     use crate::hal::tim::{OnePulse, OneshotTimer};
+    use crate::indicator;
+    use crate::math::ScaleBy;
     use crate::panic::OptionalExt;
     use crate::pulse;
     use crate::pulse::{Pulses, UnadjustedPulses};
@@ -45,11 +48,13 @@ mod app {
     use dwt_systick_monotonic::DwtSystick;
     use heapless::Vec;
     use stm32f1xx_hal::adc::{Adc, AdcDma, Continuous};
-    use stm32f1xx_hal::device::{ADC1, TIM1};
+    use stm32f1xx_hal::device::{ADC1, TIM1, TIM3, TIM4};
     use stm32f1xx_hal::dma::{dma1, CircBuffer, Event};
     use stm32f1xx_hal::gpio::PinState;
     use stm32f1xx_hal::prelude::*;
-    use stm32f1xx_hal::timer::{Ch, Tim1NoRemap};
+    use stm32f1xx_hal::timer::{
+        Ch, Channel::*, PwmHz, Tim1NoRemap, Tim3NoRemap, Tim4NoRemap, Timer,
+    };
 
     #[shared]
     struct Shared {
@@ -64,6 +69,28 @@ mod app {
         >,
         fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
         next_pulses: &'static mut UnadjustedPulses,
+        amplitude_timer: PwmHz<
+            TIM3,
+            Tim3NoRemap,
+            (Ch<0>, Ch<1>, Ch<2>, Ch<3>),
+            (
+                pins::A6_TIM3C1,
+                pins::A7_TIM3C2,
+                pins::B0_TIM3C3,
+                pins::B1_TIM3C4,
+            ),
+        >,
+        threshold_timer: PwmHz<
+            TIM4,
+            Tim4NoRemap,
+            (Ch<0>, Ch<1>, Ch<2>, Ch<3>),
+            (
+                pins::B6_TIM4C1,
+                pins::B7_TIM4C2,
+                pins::B8_TIM4C3,
+                pins::B9_TIM4C4,
+            ),
+        >,
         pulse_timer:
             OnePulse<TIM1, Tim1NoRemap, Ch<0>, pins::A8_TIM1C1_PULSE, { config::clk::TIM1CLK_HZ }>,
         debug_led: pins::C13_DEBUG_LED,
@@ -81,6 +108,7 @@ mod app {
         let dma1 = cx.device.DMA1.split();
         let mut flash = cx.device.FLASH.constrain();
         let mut gpioa = cx.device.GPIOA.split();
+        let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
         let rcc = cx.device.RCC.constrain();
 
@@ -113,6 +141,40 @@ mod app {
         let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
 
         let adc_dma = adc1.with_dma(adc_ch0, dma1_ch1);
+
+        defmt::info!("Configuring amplitude indicator timer...");
+
+        let tim3_ch4: pins::B1_TIM3C4 = gpiob.pb1.into_alternate_push_pull(&mut gpiob.crl);
+        let tim3_ch3: pins::B0_TIM3C3 = gpiob.pb0.into_alternate_push_pull(&mut gpiob.crl);
+        let tim3_ch2: pins::A7_TIM3C2 = gpioa.pa7.into_alternate_push_pull(&mut gpioa.crl);
+        let tim3_ch1: pins::A6_TIM3C1 = gpioa.pa6.into_alternate_push_pull(&mut gpioa.crl);
+
+        let mut amplitude_timer = Timer::new(cx.device.TIM3, &clocks).pwm_hz(
+            (tim3_ch1, tim3_ch2, tim3_ch3, tim3_ch4),
+            &mut afio.mapr,
+            config::indicator::PWM_FREQ,
+        );
+        for ch in [C1, C2, C3, C4] {
+            amplitude_timer.set_duty(ch, 0);
+            amplitude_timer.enable(ch);
+        }
+
+        defmt::info!("Configuring threshold indicator timer...");
+
+        let tim4_ch1: pins::B6_TIM4C1 = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
+        let tim4_ch2: pins::B7_TIM4C2 = gpiob.pb7.into_alternate_push_pull(&mut gpiob.crl);
+        let tim4_ch3: pins::B8_TIM4C3 = gpiob.pb8.into_alternate_push_pull(&mut gpiob.crh);
+        let tim4_ch4: pins::B9_TIM4C4 = gpiob.pb9.into_alternate_push_pull(&mut gpiob.crh);
+
+        let mut threshold_timer = Timer::new(cx.device.TIM4, &clocks).pwm_hz(
+            (tim4_ch1, tim4_ch2, tim4_ch3, tim4_ch4),
+            &mut afio.mapr,
+            config::indicator::PWM_FREQ,
+        );
+        for ch in [C1, C2, C3, C4] {
+            threshold_timer.set_duty(ch, 0);
+            threshold_timer.enable(ch);
+        }
 
         defmt::info!("Configuring pulse output timer...");
 
@@ -165,6 +227,8 @@ mod app {
                 adc_dma_transfer,
                 fft_buf,
                 next_pulses,
+                amplitude_timer,
+                threshold_timer,
                 pulse_timer,
                 debug_led: led,
             },
@@ -248,6 +312,8 @@ mod app {
             adc_dma_transfer,
             fft_buf,
             next_pulses,
+            amplitude_timer,
+            threshold_timer,
             debug_led,
         ],
         priority = 14,
@@ -294,6 +360,13 @@ mod app {
             let values: &mut [_; config::adc::BUF_LEN_PROCESSED] =
                 values.try_into().unwrap_infallible();
 
+            // Step 0: compute and display amplitude from raw samples
+            let amplitude_factors = indicator::amplitude_scaling_factors(samples);
+            for (factor, ch) in amplitude_factors.into_iter().zip([C4, C3, C2, C1]) {
+                let duty = cx.local.amplitude_timer.get_max_duty().scale_by(factor);
+                cx.local.amplitude_timer.set_duty(ch, duty);
+            }
+
             // Step 1: populate values and padding in FFT scratch buffer
             adc::process_raw_samples(samples, values);
             padding.fill(0);
@@ -310,6 +383,13 @@ mod app {
 
             // Step 5: compute pulses based on peaks
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
+
+            // Step 6: compute and display "above threshold" from peaks
+            let threshold_factors = indicator::threshold_scaling_factors(&peaks);
+            for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
+                let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
+                cx.local.threshold_timer.set_duty(ch, duty);
+            }
         });
 
         let duration = monotonics::now() - mid;

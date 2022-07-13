@@ -30,9 +30,12 @@ pub fn dump_to_log() {
         - BUF_LEN_REAL:    {}\n\
         - BUF_LEN_COMPLEX: {}\n\
         - FREQ_RESOLUTION: {}.{} Hz (max {}.{} Hz)\n\
+        - MAX_FEASIBLE_AMPLITUDE: {}\n\
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
         - AMPLITUDE_THRESHOLD: {}\n\
+        Indicator LEDs:\n\
+        - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
         - DURATION: {}.{} us\n\
         - SCHEDULING_OFFSET: {}.{} us\n\
@@ -68,8 +71,10 @@ pub fn dump_to_log() {
         fft::FREQ_RESOLUTION_X1000 % 1000,
         fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 / 1000,
         fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
+        fft::MAX_FEASIBLE_AMPLITUDE,
         fft::analysis::MAX_PEAKS,
         fft::analysis::AMPLITUDE_THRESHOLD,
+        indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION.to_nanos() / 1000,
         pulse::DURATION.to_nanos() % 1000,
         pulse::SCHEDULING_OFFSET.to_nanos() / 1000,
@@ -218,6 +223,8 @@ pub mod adc {
 /// FFT configuration
 pub mod fft {
     use crate::config;
+    use crate::fft;
+    use crate::math::const_scale_by_u16_u16;
     use defmt::Format;
 
     /// Possible window functions to apply to sampled data before running the FFT.
@@ -267,14 +274,38 @@ pub mod fft {
     pub const FREQ_RESOLUTION_X1000: usize =
         10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
 
+    /// Maximum feasible amplitude of an FFT peak.
+    pub const MAX_FEASIBLE_AMPLITUDE: u16 = {
+        let amplitude = config::adc::MAX_POSSIBLE_SAMPLE;
+        // amplitude is scaled down by zeroed padding added to samples
+        let zeroed_padding_factor =
+            (u16::MAX as u32 * config::adc::BUF_LEN_PROCESSED as u32 / BUF_LEN_REAL as u32) as u16;
+        let amplitude = const_scale_by_u16_u16(amplitude, zeroed_padding_factor);
+        // amplitude is scaled down by window function
+        let window_factor = fft::window::amplitude_scale_factor();
+        let amplitude = const_scale_by_u16_u16(amplitude, window_factor);
+        // for some unexplainable reason, the actual achievable amplitude is a factor of slightly less than 3 off...
+        // use a factor of approximately 2*sqrt(2) to provide some safety margin
+        let fudge_factor_x_10 = 28;
+        let amplitude = amplitude * 10 / fudge_factor_x_10;
+        amplitude
+    };
+
     pub mod analysis {
         /// Maximum number of peaks to find in the FFT spectrum
         pub const MAX_PEAKS: usize = 8;
 
         /// Minimum amplitude for a FFT bin to be considered a peak
-        pub(in crate::config) const AMPLITUDE_THRESHOLD: u16 = 50;
+        pub const AMPLITUDE_THRESHOLD: u16 = 50;
         pub const AMPLITUDE_THRESHOLD_SQUARED: u32 = (AMPLITUDE_THRESHOLD as u32).pow(2);
     }
+}
+
+/// Indicator LED configuration
+pub mod indicator {
+    use fugit::Hertz;
+
+    pub const PWM_FREQ: Hertz<u32> = Hertz::<u32>::kHz(100);
 }
 
 /// Pulse generation configuration
