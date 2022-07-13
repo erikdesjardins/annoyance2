@@ -20,7 +20,10 @@ pub fn process_raw_samples(
         let oversample: i32 = config::adc::OVERSAMPLE.try_into().unwrap_infallible();
         let sample: i32 = sample.div_round(oversample);
         // subtract Vcc/2 offset
-        let offset: i32 = (1 << config::adc::RESOLUTION_BITS) / 2;
+        let max_possible_sample: i32 = config::adc::MAX_POSSIBLE_SAMPLE
+            .try_into()
+            .unwrap_infallible();
+        let offset: i32 = max_possible_sample / 2;
         let sample: i32 = sample - offset;
         // truncate sum, which should fit into i16 because ADC only has 12 bits of resolution
         let sample: i16 = sample.truncate();

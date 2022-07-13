@@ -17,7 +17,8 @@ pub fn dump_to_log() {
         - PCLK2:    {} Hz\n\
         - ADCCLK:   {} Hz\n\
         ADC:\n\
-        - RESOLUTION_BITS: {} (max amplitude {})\n\
+        - RESOLUTION_BITS: {}\n\
+        - MAX_POSSIBLE_SAMPLE: {}\n\
         - OVERSAMPLE: {}\n\
         - SAMPLES_PER_SEC_RAW:       {}.{} (oversampled)\n\
         - SAMPLES_PER_SEC_PROCESSED: {}.{}\n\
@@ -51,7 +52,7 @@ pub fn dump_to_log() {
         clk::PCLK2.to_Hz(),
         clk::ADCCLK.to_Hz(),
         adc::RESOLUTION_BITS,
-        1 << adc::RESOLUTION_BITS,
+        adc::MAX_POSSIBLE_SAMPLE,
         adc::OVERSAMPLE,
         adc::SAMPLES_PER_SEC_RAW_X100 / 100,
         adc::SAMPLES_PER_SEC_RAW_X100 % 100,
@@ -160,6 +161,9 @@ pub mod adc {
 
     /// The resolution of the hardware ADC being used.
     pub const RESOLUTION_BITS: u16 = 12;
+
+    /// The maximum possible sample value from the hardware ADC.
+    pub const MAX_POSSIBLE_SAMPLE: u16 = (1 << RESOLUTION_BITS) - 1;
 
     /// ADC averages x samples for each data point
     pub const OVERSAMPLE: usize = 2;
