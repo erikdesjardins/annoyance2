@@ -50,7 +50,11 @@ pub const fn amplitude_scale_factor() -> u16 {
         i += 1;
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     let avg = sum / window.len() as u32;
 
-    avg as u16
+    #[allow(clippy::cast_possible_truncation)]
+    let avg = avg as u16;
+
+    avg
 }

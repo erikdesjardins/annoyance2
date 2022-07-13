@@ -2,6 +2,8 @@
 #![no_std]
 #![allow(
     clippy::assertions_on_constants,
+    clippy::let_and_return,
+    clippy::let_unit_value,
     clippy::needless_range_loop,
     clippy::redundant_pattern_matching,
     clippy::type_complexity

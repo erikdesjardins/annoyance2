@@ -278,6 +278,7 @@ pub mod fft {
     pub const MAX_FEASIBLE_AMPLITUDE: u16 = {
         let amplitude = config::adc::MAX_POSSIBLE_SAMPLE;
         // amplitude is scaled down by zeroed padding added to samples
+        #[allow(clippy::cast_possible_truncation)]
         let zeroed_padding_factor =
             (u16::MAX as u32 * config::adc::BUF_LEN_PROCESSED as u32 / BUF_LEN_REAL as u32) as u16;
         let amplitude = const_scale_by_u16_u16(amplitude, zeroed_padding_factor);
