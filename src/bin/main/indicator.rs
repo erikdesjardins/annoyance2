@@ -31,12 +31,19 @@ pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u1
 
     // Step 3: compute scale factor in resolution bits
 
-    let overall_scale_factor = max_possible_sample - closest_to_clipping;
+    // because we check from both sides, the closest sample to clipping can be at most `max_possible_sample/2` away from an extremity
+    // so this value is in `max_possible_sample/2..=max_possible_sample`
+    let closeness_to_max_possible_sample = max_possible_sample - closest_to_clipping;
 
-    // Step 4: scale up scale factor to full u16 range
+    // Step 4: compute scale factor in full u16 range
 
-    let overall_scale_factor =
-        overall_scale_factor << (u16::BITS - u32::from(config::adc::RESOLUTION_BITS));
+    // shift down from `max_possible_sample/2..=max_possible_sample` to `0..=max_possible_sample/2`
+    // and then scale up to `0..=max_possible_sample`
+    let adjusted_closeness_to_half_max_sample =
+        (closeness_to_max_possible_sample - (max_possible_sample / 2)) * 2;
+    // scale up from ADC sample range to full u16 range
+    let overall_scale_factor = adjusted_closeness_to_half_max_sample
+        << (u16::BITS - u32::from(config::adc::RESOLUTION_BITS));
 
     // Step 5: distribute scale factor
 
