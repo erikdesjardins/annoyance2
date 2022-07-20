@@ -2,7 +2,7 @@
 authors = ["Erik Desjardins <erikdesjardins@users.noreply.github.com>"]
 name = "annoyance2"
 edition = "2021"
-version = "0.0.0"
+version = "1.0.0"
 
 [workspace]
 members = ["testsuite"]
