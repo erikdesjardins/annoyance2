@@ -371,10 +371,12 @@ mod app {
         }
 
         let mid = monotonics::now();
-        defmt::debug!(
-            "Finished scheduling new pulses after {}us",
-            (mid - start).to_micros()
-        );
+        if config::debug::LOG_TIMING {
+            defmt::println!(
+                "Finished scheduling new pulses after {}us",
+                (mid - start).to_micros()
+            );
+        }
 
         // Phase 2: update current values of controls
 
@@ -461,14 +463,20 @@ mod app {
 
         let duration = monotonics::now() - mid;
         match res {
-            Ok(()) => defmt::debug!(
-                "Finished processing ADC buffer after {}us.",
-                duration.to_micros()
-            ),
-            Err(_) => defmt::warn!(
-                "ADC buffer processing did not complete in time (took {}us).",
-                duration.to_micros()
-            ),
+            Ok(()) => {
+                if config::debug::LOG_TIMING {
+                    defmt::println!(
+                        "Finished processing ADC buffer after {}us.",
+                        duration.to_micros()
+                    );
+                }
+            }
+            Err(_) => {
+                defmt::warn!(
+                    "ADC buffer processing did not complete in time (took {}us).",
+                    duration.to_micros()
+                );
+            }
         }
 
         cx.local.debug_led.set_high();
