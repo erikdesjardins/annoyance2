@@ -9,11 +9,11 @@ pub mod pins {
     /// Amplified single-ended audio input
     pub type A0_ADC1C0 = Pin<Analog, CRL, 'A', 0>;
 
-    /// Pulse width potentiometer
-    pub type A1_ADC2C1 = Pin<Analog, CRL, 'A', 1>;
-
     /// Threshold potentiometer
     pub type A2_ADC2C2 = Pin<Analog, CRL, 'A', 2>;
+
+    /// Pulse width potentiometer
+    pub type A1_ADC2C1 = Pin<Analog, CRL, 'A', 1>;
 
     /// Amplitude indicator LED 1
     pub type B1_TIM3C4 = Pin<Alternate<PushPull>, CRL, 'B', 1>;

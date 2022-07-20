@@ -5,6 +5,7 @@ pub fn dump_to_log() {
         - FAKE_INPUT_DATA:           {}\n\
         - FAKE_INPUT_CYCLES_PER_BUF: {} ({} Hz)\n\
         - FAKE_INPUT_AMPLITUDE:      {}\n\
+        - LOG_CONTROL_VALUES: {}\n\
         - LOG_LAST_FEW_SAMPLES: {}\n\
         - LOG_LAST_N_SAMPLES:   {}\n\
         - LOG_FFT_PEAKS: {}\n\
@@ -33,17 +34,18 @@ pub fn dump_to_log() {
         - MAX_FEASIBLE_AMPLITUDE: {}\n\
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
-        - AMPLITUDE_THRESHOLD: {}\n\
+        - AMPLITUDE_THRESHOLD_RANGE: {} .. {}\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
-        - DURATION: {}.{} us\n\
+        - DURATION_RANGE: {}.{} .. {}.{} us\n\
         - SCHEDULING_OFFSET: {}.{} us\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
         debug::FAKE_INPUT_CYCLES_PER_BUF * adc::BUFFERS_PER_SEC,
         debug::FAKE_INPUT_AMPLITUDE,
+        debug::LOG_CONTROL_VALUES,
         debug::LOG_LAST_FEW_SAMPLES,
         debug::LOG_LAST_N_SAMPLES,
         debug::LOG_FFT_PEAKS,
@@ -73,10 +75,13 @@ pub fn dump_to_log() {
         fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
         fft::MAX_FEASIBLE_AMPLITUDE,
         fft::analysis::MAX_PEAKS,
-        fft::analysis::AMPLITUDE_THRESHOLD,
+        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.start,
+        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.end,
         indicator::PWM_FREQ.to_Hz(),
-        pulse::DURATION.to_nanos() / 1000,
-        pulse::DURATION.to_nanos() % 1000,
+        pulse::DURATION_RANGE.start.to_nanos() / 1000,
+        pulse::DURATION_RANGE.start.to_nanos() % 1000,
+        pulse::DURATION_RANGE.end.to_nanos() / 1000,
+        pulse::DURATION_RANGE.end.to_nanos() % 1000,
         pulse::SCHEDULING_OFFSET.to_nanos() / 1000,
         pulse::SCHEDULING_OFFSET.to_nanos() % 1000,
     );
@@ -293,12 +298,14 @@ pub mod fft {
     };
 
     pub mod analysis {
+        use crate::config;
+        use core::ops::Range;
+
         /// Maximum number of peaks to find in the FFT spectrum
         pub const MAX_PEAKS: usize = 8;
 
-        /// Minimum amplitude for a FFT bin to be considered a peak
-        pub const AMPLITUDE_THRESHOLD: u16 = 50;
-        pub const AMPLITUDE_THRESHOLD_SQUARED: u32 = (AMPLITUDE_THRESHOLD as u32).pow(2);
+        /// Amplitude for a FFT bin to be considered a peak when control is set to minimum/maximum
+        pub const AMPLITUDE_THRESHOLD_RANGE: Range<u16> = 20..config::fft::MAX_FEASIBLE_AMPLITUDE;
     }
 }
 
@@ -311,12 +318,12 @@ pub mod indicator {
 
 /// Pulse generation configuration
 pub mod pulse {
-    use crate::config;
-    use fugit::Duration;
+    use crate::time::{Duration, PulseDuration};
+    use core::ops::Range;
 
-    /// Pulse duration
-    pub const DURATION: Duration<u32, 1, { config::clk::TIM1CLK_HZ }> =
-        Duration::<u32, 1, { config::clk::TIM1CLK_HZ }>::micros(1);
+    /// Pulse duration range when control is set to minimum/maximum
+    pub const DURATION_RANGE: Range<PulseDuration> =
+        PulseDuration::micros(1)..PulseDuration::micros(10);
 
     /// Start scheduling pulses this far in the future.
     ///
@@ -324,6 +331,5 @@ pub mod pulse {
     /// causing us to miss the deadline (and wait until the timer wraps).
     ///
     /// It also provides a minimum repeat rate, for the same reason.
-    pub const SCHEDULING_OFFSET: Duration<u32, 1, { config::clk::SYSCLK_HZ }> =
-        Duration::<u32, 1, { config::clk::SYSCLK_HZ }>::micros(10);
+    pub const SCHEDULING_OFFSET: Duration = Duration::micros(10);
 }

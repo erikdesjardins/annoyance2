@@ -54,6 +54,7 @@ pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u1
 #[inline(never)]
 pub fn threshold_scaling_factors(
     peaks: &Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
+    amplitude_threshold: u16,
 ) -> [u16; N] {
     // Step 1: find max peak amplitude
 
@@ -64,12 +65,11 @@ pub fn threshold_scaling_factors(
 
     // Step 2: find how far above threshold this amplitude is
 
-    let above_threshold = max_amplitude - config::fft::analysis::AMPLITUDE_THRESHOLD;
+    let above_threshold = max_amplitude - amplitude_threshold;
 
     // Step 3: scale up to full u16 range based on max feasible amplitude
 
-    let possible_range_above_threshold =
-        config::fft::MAX_FEASIBLE_AMPLITUDE - config::fft::analysis::AMPLITUDE_THRESHOLD;
+    let possible_range_above_threshold = config::fft::MAX_FEASIBLE_AMPLITUDE - amplitude_threshold;
 
     let overall_scale_factor: u32 = u32::from(above_threshold) * u32::from(u16::MAX)
         / u32::from(possible_range_above_threshold);

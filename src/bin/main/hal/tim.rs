@@ -53,7 +53,6 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
         self,
         _pins: PINS,
         mapr: &mut MAPR,
-        pulse_time: Duration<u32, 1, FREQ>,
     ) -> OnePulse<TIM1, REMAP, P, PINS, FREQ>
     where
         REMAP: Remap<Periph = TIM1>,
@@ -106,19 +105,6 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
             self.tim.ccer.modify(|_, w| w.cc4e().set_bit());
         }
 
-        // Enable preload for ARR
-        self.tim.cr1.modify(|_, w| w.arpe().bit(true));
-
-        // time is ARR - CCR + 1, so subtract 1 tick
-        // (note that CCR is effectively 0 here due to fast enable)
-        self.tim.arr.write(|w| {
-            w.arr().bits({
-                let ticks = pulse_time.ticks() - 1;
-                assert!(ticks > 0);
-                ticks.try_into().unwrap()
-            })
-        });
-
         // Trigger update event to load the registers
         // (also sets the URS bit to prevent an interrupt from being triggered by the UG bit)
         self.tim.cr1.modify(|_, w| w.urs().set_bit());
@@ -140,7 +126,17 @@ where
     REMAP: Remap<Periph = TIM1>,
     PINS: Pins<REMAP, P>,
 {
-    pub fn reset_and_fire(&mut self) {
+    pub fn fire(&mut self, pulse_time: Duration<u32, 1, FREQ>) {
+        // time is ARR - CCR + 1, so subtract 1 tick
+        // (note that CCR is effectively 0 here due to fast enable)
+        self.timer.tim.arr.write(|w| {
+            w.arr().bits({
+                let ticks = pulse_time.ticks() - 1;
+                assert!(ticks > 0);
+                ticks.try_into().unwrap()
+            })
+        });
+
         // enable one pulse mode and start the timer
         self.timer
             .tim

@@ -11,6 +11,7 @@ const FIRST_NON_DC_BIN: usize = 1;
 #[inline(never)]
 pub fn find_peaks(
     bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2],
+    amplitude_threshold: u16,
     peaks_out: &mut Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
 ) {
     struct PeakLoc {
@@ -40,6 +41,8 @@ pub fn find_peaks(
     // ...           ...... ...
     //
 
+    let amplitude_threshold_squared: u32 = u32::from(amplitude_threshold).pow(2);
+
     'next_peak: for _ in 0..peaks.capacity() {
         // Step 1: find highest point outside an existing peak
         let mut max_amplitude_squared = 0;
@@ -62,7 +65,7 @@ pub fn find_peaks(
         }
 
         // Step 2: check if highest point is above the threshold
-        if max_amplitude_squared < config::fft::analysis::AMPLITUDE_THRESHOLD_SQUARED {
+        if max_amplitude_squared < amplitude_threshold_squared {
             break 'next_peak;
         }
 

@@ -21,6 +21,7 @@ use annoyance2 as _; // global logger + panicking-behavior + memory layout
 mod adc;
 mod collections;
 mod config;
+mod control;
 mod fft;
 mod hal;
 mod indicator;
@@ -35,7 +36,6 @@ mod time;
     dispatchers = [USART1, USART2, USART3]
 )]
 mod app {
-    use crate::adc;
     use crate::config;
     use crate::fft;
     use crate::hal::pins;
@@ -45,7 +45,9 @@ mod app {
     use crate::panic::OptionalExt;
     use crate::pulse;
     use crate::pulse::{Pulses, UnadjustedPulses};
-    use crate::time::{Duration, Instant};
+    use crate::time::{Duration, Instant, PulseDuration};
+    use crate::{adc, control};
+    use core::sync::atomic::{AtomicU32, Ordering};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use heapless::Vec;
@@ -53,10 +55,13 @@ mod app {
     use stm32f1xx_hal::device::{ADC1, TIM1, TIM3, TIM4};
     use stm32f1xx_hal::dma::{dma1, CircBuffer, Event};
     use stm32f1xx_hal::gpio::PinState;
+    use stm32f1xx_hal::pac::ADC2;
     use stm32f1xx_hal::prelude::*;
     use stm32f1xx_hal::timer::{
         Ch, Channel::*, PwmHz, Tim1NoRemap, Tim3NoRemap, Tim4NoRemap, Timer,
     };
+
+    static PULSE_WIDTH_TICKS: AtomicU32 = AtomicU32::new(0);
 
     #[shared]
     struct Shared {
@@ -65,12 +70,15 @@ mod app {
 
     #[local]
     struct Local {
-        adc_dma_transfer: CircBuffer<
+        adc1_dma_transfer: CircBuffer<
             [u16; config::adc::BUF_LEN_RAW],
             AdcDma<ADC1, pins::A0_ADC1C0, Continuous, dma1::C1>,
         >,
         fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
         next_pulses: &'static mut UnadjustedPulses,
+        adc2_controls: Adc<ADC2>,
+        threshold_control_pin: pins::A2_ADC2C2,
+        pulse_width_control_pin: pins::A1_ADC2C1,
         amplitude_timer: PwmHz<
             TIM3,
             Tim3NoRemap,
@@ -130,7 +138,7 @@ mod app {
         assert!(config::clk::PCLK2 == clocks.pclk2());
         assert!(config::clk::ADCCLK == clocks.adcclk());
 
-        defmt::info!("Configuring ADC DMA transfer...");
+        defmt::info!("Configuring ADC1 DMA transfer...");
 
         let mut dma1_ch1 = dma1.1;
         // Enable interrupts on DMA1_CHANNEL1
@@ -140,9 +148,16 @@ mod app {
         let mut adc1 = Adc::adc1(cx.device.ADC1, clocks);
         adc1.set_sample_time(config::adc::SAMPLE);
 
-        let adc_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
+        let adc1_ch0: pins::A0_ADC1C0 = gpioa.pa0.into_analog(&mut gpioa.crl);
 
-        let adc_dma = adc1.with_dma(adc_ch0, dma1_ch1);
+        let adc1_dma = adc1.with_dma(adc1_ch0, dma1_ch1);
+
+        defmt::info!("Configuring ADC2 to read control values...");
+
+        let adc2_controls = Adc::adc2(cx.device.ADC2, clocks);
+
+        let threshold_control_pin: pins::A2_ADC2C2 = gpioa.pa2.into_analog(&mut gpioa.crl);
+        let pulse_width_control_pin: pins::A1_ADC2C1 = gpioa.pa1.into_analog(&mut gpioa.crl);
 
         defmt::info!("Configuring amplitude indicator timer...");
 
@@ -182,11 +197,8 @@ mod app {
 
         let tim1_ch1: pins::A8_TIM1C1_PULSE = gpioa.pa8.into_alternate_push_pull(&mut gpioa.crh);
 
-        let pulse_timer = OneshotTimer::new(cx.device.TIM1, &clocks).one_pulse_mode(
-            tim1_ch1,
-            &mut afio.mapr,
-            config::pulse::DURATION,
-        );
+        let pulse_timer =
+            OneshotTimer::new(cx.device.TIM1, &clocks).one_pulse_mode(tim1_ch1, &mut afio.mapr);
 
         defmt::info!("Configuring monotonic timer...");
 
@@ -219,16 +231,19 @@ mod app {
 
         defmt::info!("Starting ADC DMA transfer...");
 
-        let adc_dma_transfer = adc_dma.circ_read(adc_dma_buf);
+        let adc1_dma_transfer = adc1_dma.circ_read(adc_dma_buf);
 
         defmt::info!("Finished init.");
 
         (
             Shared { pulses },
             Local {
-                adc_dma_transfer,
+                adc1_dma_transfer,
                 fft_buf,
                 next_pulses,
+                adc2_controls,
+                threshold_control_pin,
+                pulse_width_control_pin,
                 amplitude_timer,
                 threshold_timer,
                 pulse_timer,
@@ -277,11 +292,16 @@ mod app {
                 return;
             }
 
+            // load pulse width
+            let pulse_width = PulseDuration::from_ticks(PULSE_WIDTH_TICKS.load(Ordering::Relaxed));
+
             // fire timer
-            cx.local.pulse_timer.reset_and_fire();
+            cx.local.pulse_timer.fire(pulse_width);
             if config::debug::LOG_ALL_PULSES {
                 defmt::println!(
-                    "Firing pulse at {}us",
+                    "Firing {}.{} us pulse at {} us",
+                    pulse_width.to_nanos() / 1000,
+                    pulse_width.to_nanos() % 1000,
                     Duration::from_ticks(now.ticks()).to_micros()
                 );
             }
@@ -311,9 +331,12 @@ mod app {
             pulses,
         ],
         local = [
-            adc_dma_transfer,
+            adc1_dma_transfer,
             fft_buf,
             next_pulses,
+            adc2_controls,
+            threshold_control_pin,
+            pulse_width_control_pin,
             amplitude_timer,
             threshold_timer,
             debug_led,
@@ -353,9 +376,50 @@ mod app {
             (mid - start).to_micros()
         );
 
-        // Phase 2: process current ADC buffer to prepare for the next swap
+        // Phase 2: update current values of controls
 
-        let res = cx.local.adc_dma_transfer.peek(|samples, _| {
+        // Step 1: read from controls
+        let amplitude_threshold = {
+            let sample = cx
+                .local
+                .adc2_controls
+                .read(cx.local.threshold_control_pin)
+                .unwrap_infallible();
+            control::adc_sample_to_value_in_range(
+                sample,
+                config::fft::analysis::AMPLITUDE_THRESHOLD_RANGE,
+            )
+        };
+        let pulse_width = {
+            let sample = cx
+                .local
+                .adc2_controls
+                .read(cx.local.pulse_width_control_pin)
+                .unwrap_infallible();
+            control::adc_sample_to_value_in_range_via(
+                sample,
+                config::pulse::DURATION_RANGE,
+                |d| d.ticks(),
+                PulseDuration::from_ticks,
+            )
+        };
+
+        // Step 2: store pulse width
+        PULSE_WIDTH_TICKS.store(pulse_width.ticks(), Ordering::Relaxed);
+
+        // Step 3: log control values
+        if config::debug::LOG_CONTROL_VALUES {
+            defmt::println!("Amplitude threshold: {}", amplitude_threshold);
+            defmt::println!(
+                "Pulse width: {}.{} us",
+                pulse_width.to_nanos() / 1000,
+                pulse_width.to_nanos() % 1000
+            );
+        }
+
+        // Phase 3: process current ADC buffer to prepare for the next swap
+
+        let res = cx.local.adc1_dma_transfer.peek(|samples, _| {
             let scratch = cx.local.fft_buf;
 
             let (values, padding) = scratch.split_at_mut(config::adc::BUF_LEN_PROCESSED);
@@ -381,13 +445,14 @@ mod app {
 
             // Step 4: find peaks in spectrum
             let mut peaks = Vec::new();
-            fft::analysis::find_peaks(bins, &mut peaks);
+            fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
 
             // Step 5: compute pulses based on peaks
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
 
             // Step 6: compute and display "above threshold" from peaks
-            let threshold_factors = indicator::threshold_scaling_factors(&peaks);
+            let threshold_factors =
+                indicator::threshold_scaling_factors(&peaks, amplitude_threshold);
             for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
                 cx.local.threshold_timer.set_duty(ch, duty);
