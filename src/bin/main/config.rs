@@ -103,7 +103,7 @@ pub mod debug;
 ///                               / 1,2,4,8,16  |
 ///                                             |
 ///                                             -> TIM1 prescaler -> TIM1
-///                                             |   if APB2_pre == 1 { 1 } else { 2 }
+///                                             |   * if APB2_pre == 1 { 1 } else { 2 }
 ///                                             |
 ///                                             -> ADC prescaler -> ADCCLK
 ///                                                 / 2,4,6,8
@@ -113,16 +113,16 @@ pub mod clk {
     /// Use external oscillator (required to get max 72MHz sysclk)
     pub const HSE_FREQ: Hertz<u32> = Hertz::<u32>::MHz(8);
 
-    /// PLLMUL @ x9 (max 72MHz)
-    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(72);
+    /// PLLMUL @ x3 (max 72MHz)
+    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(24);
     pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
-    /// APB1 prescaler @ /8 (max 36MHz)
-    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(9);
-    /// APB2 prescaler @ /8 (max 72MHz)
-    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(9);
+    /// APB1 prescaler @ /16 (max 36MHz)
+    pub const PCLK1: Hertz<u32> = Hertz::<u32>::kHz(1500);
+    /// APB2 prescaler @ /4 (max 72MHz)
+    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(6);
 
     /// TIM1 prescaler @ /1
     pub const TIM1CLK: Hertz<u32> = {
@@ -140,10 +140,8 @@ pub mod clk {
     };
     pub const TIM1CLK_HZ: u32 = TIM1CLK.to_Hz();
 
-    // For adc, want slow enough to sample audio, but fast enough that register writes are acknowledged fast (?)
-
-    /// ADC prescaler @ /4 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(2250);
+    /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(3000);
 }
 
 // Prolog for clock config:
