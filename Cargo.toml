@@ -2,18 +2,25 @@
 authors = ["Erik Desjardins <erikdesjardins@users.noreply.github.com>"]
 name = "annoyance2"
 edition = "2021"
-version = "0.0.0"
+version = "1.0.0"
 
 [workspace]
 members = ["testsuite"]
 
 [dependencies]
+cordic = "0.1"
+cortex-m = "0.7"
+cortex-m-rtic = "1"
 defmt = "0.3"
 defmt-rtt = "0.3"
 dwt-systick-monotonic = "1"
+embedded-hal = "0.2"
+fixed = "1"
+fixed-sqrt = "0.2"
+fugit = "0.3"
+heapless = "0.7"
+num-complex = { version = "0.4", default-features = false }
 panic-probe = { version = "0.3", features = ["print-defmt"] }
-cortex-m = "0.7"
-cortex-m-rtic = "1"
 stm32f1xx-hal = { version = "0.9", features = ["stm32f103", "medium", "rtic"] }
 
 [profile.dev]
