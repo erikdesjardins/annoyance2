@@ -51,7 +51,7 @@ impl Pulses {
         self.pulses
             .replace_with_mapped(&unadjusted.pulses, |pulse| Pulse {
                 period: pulse.period,
-                next: at + config::pulse::SCHEDULING_OFFSET + pulse.next,
+                next: at + pulse.next,
             })
     }
 
