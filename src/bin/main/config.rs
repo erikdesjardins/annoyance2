@@ -113,16 +113,16 @@ pub mod clk {
     /// Use external oscillator (required to get max 72MHz sysclk)
     pub const HSE_FREQ: Hertz<u32> = Hertz::<u32>::MHz(8);
 
-    /// PLLMUL @ x3 (max 72MHz)
-    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(24);
+    /// PLLMUL @ x4 (max 72MHz)
+    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(32);
     pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
     /// APB1 prescaler @ /16 (max 36MHz)
-    pub const PCLK1: Hertz<u32> = Hertz::<u32>::kHz(1500);
-    /// APB2 prescaler @ /4 (max 72MHz)
-    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(6);
+    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(2);
+    /// APB2 prescaler @ /8 (max 72MHz)
+    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(4);
 
     /// TIM1 prescaler @ /1
     pub const TIM1CLK: Hertz<u32> = {
@@ -141,7 +141,7 @@ pub mod clk {
     pub const TIM1CLK_HZ: u32 = TIM1CLK.to_Hz();
 
     /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(3000);
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(2000);
 }
 
 // Prolog for clock config:
@@ -179,7 +179,7 @@ pub mod adc {
     pub const OVERSAMPLE: usize = 2;
 
     /// Sample at ADCCLK / this
-    const SAMPLE_CYC_X10_UNADJUSTED: usize = 415;
+    const SAMPLE_CYC_X10_UNADJUSTED: usize = 285;
     pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10_UNADJUSTED {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
