@@ -196,6 +196,8 @@ pub fn find_peaks(
         let real_freq = real_freq_x1000.div_round(1000);
         // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
         let real_freq: u16 = real_freq.truncate();
+        // ensure freq is nonzero
+        let real_freq = real_freq.max(1);
 
         // Step 6: store adjusted frequency
         peak.freq = real_freq;
