@@ -331,5 +331,5 @@ pub mod pulse {
     /// causing us to miss the deadline (and wait until the timer wraps).
     ///
     /// It also provides a minimum repeat rate, for the same reason.
-    pub const SCHEDULING_OFFSET: Duration = Duration::micros(10);
+    pub const SCHEDULING_OFFSET: Duration = Duration::micros(50);
 }
