@@ -66,6 +66,7 @@ mod app {
     #[shared]
     struct Shared {
         pulses: &'static mut Pulses,
+        scheduled_pulse: Option<fire_pulse::SpawnHandle>,
     }
 
     #[local]
@@ -236,7 +237,10 @@ mod app {
         defmt::info!("Finished init.");
 
         (
-            Shared { pulses },
+            Shared {
+                pulses,
+                scheduled_pulse: None,
+            },
             Local {
                 adc1_dma_transfer,
                 fft_buf,
@@ -275,28 +279,22 @@ mod app {
     #[task(
         shared = [
             pulses,
+            scheduled_pulse,
         ],
         local = [
             pulse_timer,
         ],
         priority = 16,
-        capacity = 2 /* self + swap_buffers */,
     )]
-    fn fire_pulse(mut cx: fire_pulse::Context, now: Instant) {
-        cx.shared.pulses.lock(|pulses| {
-            // consume this pulse (rescheduling this frequency)
-            if let Err(()) = pulses.try_consume_pulse(now) {
-                // if this pulse isn't present in the pulse train, our buffer was swapped,
-                // and we've already been rescheduled
-                defmt::trace!("pulse skipped due to in-flight buffer swap");
-                return;
-            }
-
+    fn fire_pulse(cx: fire_pulse::Context, now: Instant) {
+        (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
             // load pulse width
             let pulse_width = PulseDuration::from_ticks(PULSE_WIDTH_TICKS.load(Ordering::Relaxed));
 
             // fire timer
             cx.local.pulse_timer.fire(pulse_width);
+
+            // log
             if config::debug::LOG_ALL_PULSES {
                 defmt::println!(
                     "Firing {}.{} us pulse at {} us",
@@ -306,10 +304,17 @@ mod app {
                 );
             }
 
+            // consume this pulse (rescheduling this frequency)
+            if let Err(()) = pulses.try_consume_pulse(now) {
+                defmt::warn!("Pulse was not present in pulse train");
+                return;
+            }
+
             // reschedule ourselves for the next pulse
             if let Some(next_pulse) = pulses.next_pulse(now) {
-                if let Err(_) = fire_pulse::spawn_at(next_pulse, next_pulse) {
-                    defmt::warn!("fire_pulse schedule overrun");
+                match fire_pulse::spawn_at(next_pulse, next_pulse) {
+                    Ok(handle) => *scheduled_pulse = Some(handle),
+                    Err(_) => defmt::warn!("Internal fire_pulse schedule overrun"),
                 }
             }
         });
@@ -329,6 +334,7 @@ mod app {
         binds = DMA1_CHANNEL1,
         shared = [
             pulses,
+            scheduled_pulse,
         ],
         local = [
             adc1_dma_transfer,
@@ -343,7 +349,7 @@ mod app {
         ],
         priority = 14,
     )]
-    fn swap_buffers(mut cx: swap_buffers::Context) {
+    fn swap_buffers(cx: swap_buffers::Context) {
         cx.local.debug_led.set_low();
 
         // getting the timestamp must happen a consistent delay after the start of the task,
@@ -357,18 +363,28 @@ mod app {
 
         // Phase 1: swap in new pulse train and reschedule
 
-        // Step 1: adjust pulses and swap
-        let next_pulse = cx.shared.pulses.lock(|pulses| {
+        (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
+            // Step 1: adjust pulses and swap
             pulses.replace_with_adjusted(cx.local.next_pulses, start);
-            pulses.next_pulse(start)
-        });
 
-        // Step 2: schedule task for next pulse
-        if let Some(next_pulse) = next_pulse {
-            if let Err(_) = fire_pulse::spawn_at(next_pulse, next_pulse) {
-                defmt::warn!("fire_pulse schedule overrun (from swap_buffers2)");
+            // Step 2: compute next pulse
+            let next_pulse = pulses.next_pulse(start);
+
+            // Step 3: cancel existing scheduled next pulse
+            if let Some(handle) = scheduled_pulse.take() {
+                if let Err(e) = handle.cancel() {
+                    defmt::warn!("In-flight pulse could not be cancelled: {}", e);
+                }
             }
-        }
+
+            // Step 4: schedule task for next pulse
+            if let Some(next_pulse) = next_pulse {
+                match fire_pulse::spawn_at(next_pulse, next_pulse) {
+                    Ok(handle) => *scheduled_pulse = Some(handle),
+                    Err(_) => defmt::warn!("External fire_pulse schedule overrun"),
+                }
+            }
+        });
 
         let mid = monotonics::now();
         if config::debug::LOG_TIMING {
