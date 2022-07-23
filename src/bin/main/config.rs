@@ -281,7 +281,8 @@ pub mod fft {
 
     /// Maximum feasible amplitude of an FFT peak.
     pub const MAX_FEASIBLE_AMPLITUDE: u16 = {
-        let amplitude = config::adc::MAX_POSSIBLE_SAMPLE;
+        // samples are scaled up to full i16 range, allowing a potential amplitude of all 16 bits
+        let amplitude = u16::MAX;
         // amplitude is scaled down by zeroed padding added to samples
         #[allow(clippy::cast_possible_truncation)]
         let zeroed_padding_factor =
@@ -292,8 +293,8 @@ pub mod fft {
         let amplitude = const_scale_by_u16_u16(amplitude, window_factor);
         // for some unexplainable reason, the actual achievable amplitude is a factor of slightly less than 3 off...
         // use a factor of approximately 2*sqrt(2) to provide some safety margin
-        let fudge_factor_x_10 = 28;
-        let amplitude = amplitude * 10 / fudge_factor_x_10;
+        let fudge_factor = (u16::MAX as u32 * 100 / 282) as u16;
+        let amplitude = const_scale_by_u16_u16(amplitude, fudge_factor);
         amplitude
     };
 
@@ -305,7 +306,7 @@ pub mod fft {
         pub const MAX_PEAKS: usize = 8;
 
         /// Amplitude for a FFT bin to be considered a peak when control is set to minimum/maximum
-        pub const AMPLITUDE_THRESHOLD_RANGE: Range<u16> = 20..config::fft::MAX_FEASIBLE_AMPLITUDE;
+        pub const AMPLITUDE_THRESHOLD_RANGE: Range<u16> = 100..config::fft::MAX_FEASIBLE_AMPLITUDE;
     }
 }
 

@@ -455,8 +455,8 @@ mod app {
             adc::process_raw_samples(samples, values);
             padding.fill(0);
 
-            // Step 2: apply window function to data
-            fft::window::apply_to(values);
+            // Step 2: apply window function and scaling to data
+            fft::window::apply_with_scaling(values);
 
             // Step 3: run fft
             let bins = fft::run(scratch);
