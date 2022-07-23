@@ -292,6 +292,7 @@ pub mod fft {
         let amplitude = const_scale_by_u16_u16(amplitude, window_factor);
         // for some unexplainable reason, the actual achievable amplitude is a factor of slightly less than 3 off...
         // use a factor of approximately 2*sqrt(2) to provide some safety margin
+        #[allow(clippy::cast_possible_truncation)]
         let fudge_factor = (u16::MAX as u32 * 100 / 282) as u16;
         let amplitude = const_scale_by_u16_u16(amplitude, fudge_factor);
         amplitude

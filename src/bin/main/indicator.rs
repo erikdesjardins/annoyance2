@@ -61,7 +61,8 @@ pub fn threshold_scaling_factors(
     let max_peaks: u32 = config::fft::analysis::MAX_PEAKS
         .try_into()
         .unwrap_infallible();
-    let overall_scale_factor: u32 = u32::from(u16::MAX) * peaks.len() as u32 / max_peaks;
+    let overall_scale_factor: u32 =
+        u32::from(u16::MAX) * u32::from(peaks.len().truncate()) / max_peaks;
     let overall_scale_factor: u16 = overall_scale_factor.truncate();
 
     // Step 2: distribute scale factor
