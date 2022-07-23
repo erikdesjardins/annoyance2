@@ -1,5 +1,6 @@
 use crate::collections::ReplaceWithMapped;
 use crate::config;
+use crate::control;
 use crate::math::{amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, Truncate};
 use crate::panic::OptionalExt;
 use fugit::{Duration, Hertz, RateExtU32};
@@ -11,7 +12,7 @@ const FIRST_NON_DC_BIN: usize = 1;
 #[inline(never)]
 pub fn find_peaks(
     bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2],
-    amplitude_threshold: u16,
+    amplitude_threshold: control::Sample,
     peaks_out: &mut Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
 ) {
     struct PeakLoc {
@@ -41,8 +42,6 @@ pub fn find_peaks(
     // ...           ...... ...
     //
 
-    let amplitude_threshold_squared: u32 = u32::from(amplitude_threshold).pow(2);
-
     'next_peak: for _ in 0..peaks.capacity() {
         // Step 1: find highest point outside an existing peak
         let mut max_amplitude_squared = 0;
@@ -64,8 +63,9 @@ pub fn find_peaks(
             i_at_max = i;
         }
 
-        // Step 2: check if highest point is above the threshold
-        if max_amplitude_squared < amplitude_threshold_squared {
+        // Step 2: check if highest point is above the noise floor
+        // (points below the user-controlled threshold will be culled below)
+        if max_amplitude_squared < config::fft::analysis::NOISE_FLOOR_AMPLITUDE_SQUARED {
             break 'next_peak;
         }
 
@@ -203,19 +203,39 @@ pub fn find_peaks(
         peak.freq = real_freq;
     }
 
-    // Phase 3: store peaks
+    // Phase 3: cull peaks below threshold
+
+    if let Some(highest) = peaks.first() {
+        let amplitude_threshold = {
+            let highest_amplitude = amplitude_sqrt(amplitude_squared(bins[highest.i]));
+            // ensure highest amplitude is above noise floor (it should be, but sqrt might not be precise)
+            let highest_amplitude =
+                highest_amplitude.max(config::fft::analysis::NOISE_FLOOR_AMPLITUDE);
+
+            amplitude_threshold
+                .to_value_in_range(config::fft::analysis::NOISE_FLOOR_AMPLITUDE..highest_amplitude)
+        };
+
+        peaks.retain(|peak| {
+            let bin = bins[peak.i];
+            let amplitude = amplitude_sqrt(amplitude_squared(bin));
+            amplitude >= amplitude_threshold
+        });
+    }
+
+    // Phase 4: store peaks
 
     peaks_out.replace_with_mapped(&peaks, |peak| {
         Peak::from_bin_and_freq(bins[peak.i], peak.freq)
     });
 
-    // Phase 4: log peaks
+    // Phase 5: log peaks
 
     if config::debug::LOG_FFT_PEAKS {
         for peak in &peaks {
             let bin = bins[peak.i];
-            let max_amplitude = amplitude_sqrt(amplitude_squared(bin));
-            let deg_at_max = 360.scale_by(phase(bin));
+            let amplitude = amplitude_sqrt(amplitude_squared(bin));
+            let phase_deg = 360.scale_by(phase(bin));
 
             let peak_freq = peak.freq;
             let center_freq = i_to_freq(peak.i);
@@ -224,12 +244,12 @@ pub fn find_peaks(
 
             defmt::println!(
                 "Peak amplitude = {} @ freq = {} (mid {}, lo {}, hi {}) Hz, phase = {} deg",
-                max_amplitude,
+                amplitude,
                 peak_freq,
                 center_freq,
                 left_freq,
                 right_freq,
-                deg_at_max,
+                phase_deg,
             );
         }
     }
@@ -244,24 +264,17 @@ fn i_to_freq(i: usize) -> u16 {
 
 /// Represents one peak frequency from the FFT, with frequency and scale factor
 pub struct Peak {
-    amplitude: u16,
     freq: u16,
     phase_scale_factor: u16,
 }
 
 impl Peak {
     fn from_bin_and_freq(bin: Complex<i16>, freq: u16) -> Self {
-        let amplitude = amplitude_sqrt(amplitude_squared(bin));
         let phase_scale_factor = phase(bin);
         Self {
-            amplitude,
             freq,
             phase_scale_factor,
         }
-    }
-
-    pub fn amplitude(&self) -> u16 {
-        self.amplitude
     }
 
     pub fn freq(&self) -> Hertz<u32> {

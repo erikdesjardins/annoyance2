@@ -1,6 +1,7 @@
 use crate::config;
 use crate::fft::analysis::Peak;
 use crate::math::Truncate;
+use crate::panic::OptionalExt;
 use heapless::Vec;
 
 /// Number of indicators to distribute the scaling factor between
@@ -54,28 +55,16 @@ pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u1
 #[inline(never)]
 pub fn threshold_scaling_factors(
     peaks: &Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
-    amplitude_threshold: u16,
 ) -> [u16; N] {
-    // Step 1: find max peak amplitude
+    // Step 1: divide peaks found by max possible peaks
 
-    let max_amplitude = match peaks.iter().map(Peak::amplitude).max() {
-        Some(max) => max,
-        None => return distribute_scale_factor(0),
-    };
-
-    // Step 2: find how far above threshold this amplitude is
-
-    let above_threshold = max_amplitude - amplitude_threshold;
-
-    // Step 3: scale up to full u16 range based on max feasible amplitude
-
-    let possible_range_above_threshold = config::fft::MAX_FEASIBLE_AMPLITUDE - amplitude_threshold;
-
-    let overall_scale_factor: u32 = u32::from(above_threshold) * u32::from(u16::MAX)
-        / u32::from(possible_range_above_threshold);
+    let max_peaks: u32 = config::fft::analysis::MAX_PEAKS
+        .try_into()
+        .unwrap_infallible();
+    let overall_scale_factor: u32 = u32::from(u16::MAX) * peaks.len() as u32 / max_peaks;
     let overall_scale_factor: u16 = overall_scale_factor.truncate();
 
-    // Step 3: distribute scale factor
+    // Step 2: distribute scale factor
 
     distribute_scale_factor(overall_scale_factor)
 }

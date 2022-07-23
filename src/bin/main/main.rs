@@ -403,10 +403,7 @@ mod app {
                 .adc2_controls
                 .read(cx.local.threshold_control_pin)
                 .unwrap_infallible();
-            control::adc_sample_to_value_in_range(
-                sample,
-                config::fft::analysis::AMPLITUDE_THRESHOLD_RANGE,
-            )
+            control::Sample::new(sample)
         };
         let pulse_width = {
             let sample = cx
@@ -414,8 +411,7 @@ mod app {
                 .adc2_controls
                 .read(cx.local.pulse_width_control_pin)
                 .unwrap_infallible();
-            control::adc_sample_to_value_in_range_via(
-                sample,
+            control::Sample::new(sample).to_value_in_range_via(
                 config::pulse::DURATION_RANGE,
                 |d| d.ticks(),
                 PulseDuration::from_ticks,
@@ -469,8 +465,7 @@ mod app {
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
 
             // Step 6: compute and display "above threshold" from peaks
-            let threshold_factors =
-                indicator::threshold_scaling_factors(&peaks, amplitude_threshold);
+            let threshold_factors = indicator::threshold_scaling_factors(&peaks);
             for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
                 cx.local.threshold_timer.set_duty(ch, duty);

@@ -35,7 +35,7 @@ pub fn dump_to_log() {
         - MAX_FEASIBLE_AMPLITUDE: {}\n\
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
-        - AMPLITUDE_THRESHOLD_RANGE: {} .. {}\n\
+        - NOISE_FLOOR_AMPLITUDE: {}\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
@@ -77,8 +77,7 @@ pub fn dump_to_log() {
         fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
         fft::MAX_FEASIBLE_AMPLITUDE,
         fft::analysis::MAX_PEAKS,
-        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.start,
-        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.end,
+        fft::analysis::NOISE_FLOOR_AMPLITUDE,
         indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION_RANGE.start.to_nanos() / 1000,
         pulse::DURATION_RANGE.start.to_nanos() % 1000,
@@ -299,14 +298,13 @@ pub mod fft {
     };
 
     pub mod analysis {
-        use crate::config;
-        use core::ops::Range;
-
-        /// Maximum number of peaks to find in the FFT spectrum
+        /// Maximum number of peaks to find in the FFT spectrum.
         pub const MAX_PEAKS: usize = 8;
 
-        /// Amplitude for a FFT bin to be considered a peak when control is set to minimum/maximum
-        pub const AMPLITUDE_THRESHOLD_RANGE: Range<u16> = 100..config::fft::MAX_FEASIBLE_AMPLITUDE;
+        /// Min amplitude for a FFT bin to be considered a peak.
+        /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
+        pub const NOISE_FLOOR_AMPLITUDE: u16 = 100;
+        pub const NOISE_FLOOR_AMPLITUDE_SQUARED: u32 = (NOISE_FLOOR_AMPLITUDE as u32).pow(2);
     }
 }
 
