@@ -16,7 +16,7 @@ pub fn schedule_pulses(
     pulses_out: &mut UnadjustedPulses,
 ) {
     pulses_out.pulses.replace_with_mapped(peaks, |peak| {
-        let period = peak.freq().into_duration();
+        let period = peak.period();
         let phase_offset = peak.phase_offset();
         Pulse {
             period,
