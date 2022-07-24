@@ -27,24 +27,24 @@ stm32f1xx-hal = { version = "0.9", features = ["stm32f103", "medium", "rtic"] }
 codegen-units = 1
 debug = 2
 incremental = false
-opt-level = "s"
+opt-level = 2
 
 [profile.test]
 codegen-units = 1
 debug = 2
 incremental = false
-opt-level = "s"
+opt-level = 2
 
 [profile.release]
 codegen-units = 1
 debug = 2
 incremental = false
 lto = 'fat'
-opt-level = "s"
+opt-level = 3
 
 [profile.bench]
 codegen-units = 1
 debug = 2
 incremental = false
 lto = 'fat'
-opt-level = "s"
+opt-level = 3
