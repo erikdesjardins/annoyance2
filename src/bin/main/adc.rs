@@ -25,7 +25,8 @@ pub fn process_raw_samples(
             .unwrap_infallible();
         let offset: i32 = max_possible_sample / 2;
         let sample: i32 = sample - offset;
-        // truncate sum, which should fit into i16 because ADC only has 12 bits of resolution
+        // truncate sum, which should fit into i16 because ADC has < 16 bits of (unsigned) resolution
+        assert!(config::adc::RESOLUTION_BITS < i16::BITS);
         let sample: i16 = sample.truncate();
         *value = sample;
     }
