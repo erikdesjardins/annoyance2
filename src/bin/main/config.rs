@@ -169,10 +169,11 @@ pub mod adc {
     use stm32f1xx_hal::adc::SampleTime;
 
     /// The resolution of the hardware ADC being used.
-    pub const RESOLUTION_BITS: u16 = 12;
+    pub const RESOLUTION_BITS: u32 = 12;
 
     /// The maximum possible sample value from the hardware ADC.
-    pub const MAX_POSSIBLE_SAMPLE: u16 = (1 << RESOLUTION_BITS) - 1;
+    #[allow(clippy::cast_possible_truncation)]
+    pub const MAX_POSSIBLE_SAMPLE: u16 = (1 << RESOLUTION_BITS as u16) - 1;
 
     /// ADC averages x samples for each data point
     pub const OVERSAMPLE: usize = 2;
@@ -228,7 +229,7 @@ pub mod adc {
 pub mod fft {
     use crate::config;
     use crate::fft;
-    use crate::math::const_scale_by_u16_u16;
+    use crate::math::{const_scale_by_u16_u16, ScalingFactor};
     use defmt::Format;
 
     /// Possible window functions to apply to sampled data before running the FFT.
@@ -285,15 +286,14 @@ pub mod fft {
         // amplitude is scaled down by zeroed padding added to samples
         #[allow(clippy::cast_possible_truncation)]
         let zeroed_padding_factor =
-            (u16::MAX as u32 * config::adc::BUF_LEN_PROCESSED as u32 / BUF_LEN_REAL as u32) as u16;
+            ScalingFactor::from_ratio(config::adc::BUF_LEN_PROCESSED as u16, BUF_LEN_REAL as u16);
         let amplitude = const_scale_by_u16_u16(amplitude, zeroed_padding_factor);
         // amplitude is scaled down by window function
         let window_factor = fft::window::amplitude_scale_factor();
         let amplitude = const_scale_by_u16_u16(amplitude, window_factor);
         // for some unexplainable reason, the actual achievable amplitude is a factor of slightly less than 3 off...
         // use a factor of approximately 2*sqrt(2) to provide some safety margin
-        #[allow(clippy::cast_possible_truncation)]
-        let fudge_factor = (u16::MAX as u32 * 100 / 282) as u16;
+        let fudge_factor = ScalingFactor::from_ratio(1000, 2828);
         let amplitude = const_scale_by_u16_u16(amplitude, fudge_factor);
         amplitude
     };

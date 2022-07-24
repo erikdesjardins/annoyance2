@@ -1,6 +1,6 @@
 use crate::config;
 use crate::fft::analysis::Peak;
-use crate::math::Truncate;
+use crate::math::{ScalingFactor, Truncate};
 use crate::panic::OptionalExt;
 use heapless::Vec;
 
@@ -9,7 +9,9 @@ const N: usize = 4;
 
 /// Compute scaling factors for amplitude indicator, based on raw ADC samples.
 #[inline(never)]
-pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u16; N] {
+pub fn amplitude_scaling_factors(
+    input: &[u16; config::adc::BUF_LEN_RAW],
+) -> [ScalingFactor<u16>; N] {
     // Step 1: find min and max samples
 
     let mut min_sample = u16::MAX;
@@ -43,50 +45,28 @@ pub fn amplitude_scaling_factors(input: &[u16; config::adc::BUF_LEN_RAW]) -> [u1
     let adjusted_closeness_to_half_max_sample =
         (closeness_to_max_possible_sample - (max_possible_sample / 2)) * 2;
     // scale up from ADC sample range to full u16 range
-    let overall_scale_factor = adjusted_closeness_to_half_max_sample
-        << (u16::BITS - u32::from(config::adc::RESOLUTION_BITS));
+    let overall_scale_factor = ScalingFactor::from_sample::<{ config::adc::RESOLUTION_BITS }>(
+        adjusted_closeness_to_half_max_sample,
+    );
 
     // Step 5: distribute scale factor
 
-    distribute_scale_factor(overall_scale_factor)
+    overall_scale_factor.distribute()
 }
 
 /// Compute scaling factors for "above threshold" indicator, based on FFT peaks.
 #[inline(never)]
 pub fn threshold_scaling_factors(
     peaks: &Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
-) -> [u16; N] {
+) -> [ScalingFactor<u16>; N] {
     // Step 1: divide peaks found by max possible peaks
 
-    let max_peaks: u32 = config::fft::analysis::MAX_PEAKS
+    let max_peaks: u16 = config::fft::analysis::MAX_PEAKS
         .try_into()
         .unwrap_infallible();
-    let overall_scale_factor: u32 =
-        u32::from(u16::MAX) * u32::from(peaks.len().truncate()) / max_peaks;
-    let overall_scale_factor: u16 = overall_scale_factor.truncate();
+    let overall_scale_factor = ScalingFactor::from_ratio(peaks.len().truncate(), max_peaks);
 
     // Step 2: distribute scale factor
 
-    distribute_scale_factor(overall_scale_factor)
-}
-
-/// Split scale factor up into N buckets.
-///
-/// For example, an overall scale factor of 62.5% (5/8) would be distributed over 4 buckets to: 100% 100% 50% 0%.
-fn distribute_scale_factor(overall_scale_factor: u16) -> [u16; N] {
-    let mut factors = [0; N];
-
-    for (i, factor) in factors.iter_mut().enumerate() {
-        let max_factor_over_n: u16 = u16::MAX / N.truncate();
-        let local_factor_over_n: u16 =
-            overall_scale_factor.saturating_sub(i.truncate() * max_factor_over_n);
-        let local_factor: u16 = if local_factor_over_n >= max_factor_over_n {
-            u16::MAX
-        } else {
-            local_factor_over_n * N.truncate()
-        };
-        *factor = local_factor;
-    }
-
-    factors
+    overall_scale_factor.distribute()
 }

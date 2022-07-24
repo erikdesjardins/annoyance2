@@ -1,16 +1,20 @@
 use crate::config;
-use crate::math::ScaleBy;
+use crate::math::{ScaleBy, ScalingFactor};
 use core::convert::identity;
 use core::ops::{Add, Range, Sub};
 use defmt::Format;
 
 #[derive(Copy, Clone, Format)]
-pub struct Sample(u16);
+pub struct Sample {
+    value: ScalingFactor<u16>,
+}
 
 impl Sample {
     /// Create a control::Sample from an ADC sample from a control.
     pub fn new(sample: u16) -> Self {
-        Self(sample)
+        Self {
+            value: ScalingFactor::from_sample::<{ config::adc::RESOLUTION_BITS }>(sample),
+        }
     }
 
     /// Pick a value from a given range.
@@ -30,15 +34,12 @@ impl Sample {
         Orig: Copy,
         Scalable: Add<Output = Scalable> + Sub<Output = Scalable> + ScaleBy<u16>,
     {
-        // Step 1: scale up sample from ADC range to full u16 range
-        let scaling_factor = self.0 << (u16::BITS - u32::from(config::adc::RESOLUTION_BITS));
-
-        // Step 2: split range into base value + additional size
+        // split range into base value + additional size
         let base = into(range.start);
         let size = into(range.end) - into(range.start);
 
-        // Step 3: pick a value in the range
-        let value = from(base + size.scale_by(scaling_factor));
+        // pick a value in the range
+        let value = from(base + size.scale_by(self.value));
 
         value
     }

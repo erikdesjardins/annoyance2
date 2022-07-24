@@ -1,7 +1,9 @@
 use crate::collections::ReplaceWithMapped;
 use crate::config;
 use crate::control;
-use crate::math::{amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, Truncate};
+use crate::math::{
+    amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, ScalingFactor, Truncate,
+};
 use crate::panic::OptionalExt;
 use fugit::{Duration, Hertz, RateExtU32};
 use heapless::Vec;
@@ -265,7 +267,7 @@ fn i_to_freq(i: usize) -> u16 {
 /// Represents one peak frequency from the FFT, with frequency and scale factor
 pub struct Peak {
     freq: u16,
-    phase_scale_factor: u16,
+    phase_scale_factor: ScalingFactor<u16>,
 }
 
 impl Peak {

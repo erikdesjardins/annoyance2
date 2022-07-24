@@ -1,5 +1,5 @@
 use crate::config;
-use crate::math::{const_scale_by_i16_u16, DivRound, Truncate};
+use crate::math::{const_scale_by_i16_u16, DivRound, ScalingFactor, Truncate};
 use crate::panic::OptionalExt;
 
 #[inline(never)]
@@ -55,7 +55,10 @@ static FAKE_COS_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
         let frequency = i * config::debug::FAKE_INPUT_CYCLES_PER_BUF;
         let phase = config::debug::FAKE_INPUT_PHASE * LEN / u16::MAX as usize;
         let unscaled_sample = COS_TABLE[(frequency + phase) % LEN];
-        fake[i] = const_scale_by_i16_u16(unscaled_sample, config::debug::FAKE_INPUT_AMPLITUDE);
+        // since we know the samples are already in a 0..u16::MAX range,
+        // we can use the desired amplitude directly as a scaling factor
+        let factor = ScalingFactor::from_raw(config::debug::FAKE_INPUT_AMPLITUDE);
+        fake[i] = const_scale_by_i16_u16(unscaled_sample, factor);
         i += 1;
     }
 
