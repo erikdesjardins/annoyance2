@@ -361,6 +361,17 @@ mod app {
         // Note that we still need to start scheduling pulses quickly, however,
         // because delays could result in pulses being scheduled in the past.
 
+        let mut log_timing = {
+            let mut last = start;
+            move |label| {
+                if config::debug::LOG_TIMING {
+                    let now = monotonics::now();
+                    defmt::println!("{} after {}us", label, (now - last).to_micros());
+                    last = now;
+                }
+            }
+        };
+
         // Phase 1: swap in new pulse train and reschedule
 
         (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
@@ -386,13 +397,7 @@ mod app {
             }
         });
 
-        let mid = monotonics::now();
-        if config::debug::LOG_TIMING {
-            defmt::println!(
-                "Finished scheduling new pulses after {}us",
-                (mid - start).to_micros()
-            );
-        }
+        log_timing("Finished swapping in new pulses");
 
         // Phase 2: update current values of controls
 
@@ -418,8 +423,12 @@ mod app {
             )
         };
 
+        log_timing("Finished reading from controls");
+
         // Step 2: store pulse width
         PULSE_WIDTH_TICKS.store(pulse_width.ticks(), Ordering::Relaxed);
+
+        log_timing("Finished storing pulse width");
 
         // Step 3: log control values
         if config::debug::LOG_CONTROL_VALUES {
@@ -447,22 +456,34 @@ mod app {
                 cx.local.amplitude_timer.set_duty(ch, duty);
             }
 
+            log_timing("Finished computing indicated amplitude");
+
             // Step 1: populate values and padding in FFT scratch buffer
             adc::process_raw_samples(samples, values);
             padding.fill(0);
 
+            log_timing("Finished processing raw samples");
+
             // Step 2: apply window function and scaling to data
             fft::window::apply_with_scaling(values);
 
+            log_timing("Finished applying window function");
+
             // Step 3: run fft
             let bins = fft::run(scratch);
+
+            log_timing("Finished FFT");
 
             // Step 4: find peaks in spectrum
             let mut peaks = Vec::new();
             fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
 
+            log_timing("Finished peak detection");
+
             // Step 5: compute pulses based on peaks
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
+
+            log_timing("Finished pulse scheduling");
 
             // Step 6: compute and display "above threshold" from peaks
             let threshold_factors = indicator::threshold_scaling_factors(&peaks);
@@ -470,24 +491,16 @@ mod app {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
                 cx.local.threshold_timer.set_duty(ch, duty);
             }
+
+            log_timing("Finished computing indicated above threshold");
         });
 
-        let duration = monotonics::now() - mid;
-        match res {
-            Ok(()) => {
-                if config::debug::LOG_TIMING {
-                    defmt::println!(
-                        "Finished processing ADC buffer after {}us.",
-                        duration.to_micros()
-                    );
-                }
-            }
-            Err(_) => {
-                defmt::warn!(
-                    "ADC buffer processing did not complete in time (took {}us).",
-                    duration.to_micros()
-                );
-            }
+        if let Err(_) = res {
+            let duration = monotonics::now() - start;
+            defmt::warn!(
+                "ADC buffer processing did not complete in time (took {} us).",
+                duration.to_micros()
+            );
         }
 
         cx.local.debug_led.set_high();
