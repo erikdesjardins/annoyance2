@@ -66,6 +66,7 @@ mod app {
     #[shared]
     struct Shared {
         pulses: &'static mut Pulses,
+        scheduled_pulse: Option<fire_pulse::SpawnHandle>,
     }
 
     #[local]
@@ -236,7 +237,10 @@ mod app {
         defmt::info!("Finished init.");
 
         (
-            Shared { pulses },
+            Shared {
+                pulses,
+                scheduled_pulse: None,
+            },
             Local {
                 adc1_dma_transfer,
                 fft_buf,
@@ -275,28 +279,22 @@ mod app {
     #[task(
         shared = [
             pulses,
+            scheduled_pulse,
         ],
         local = [
             pulse_timer,
         ],
         priority = 16,
-        capacity = 2 /* self + swap_buffers */,
     )]
-    fn fire_pulse(mut cx: fire_pulse::Context, now: Instant) {
-        cx.shared.pulses.lock(|pulses| {
-            // consume this pulse (rescheduling this frequency)
-            if let Err(()) = pulses.try_consume_pulse(now) {
-                // if this pulse isn't present in the pulse train, our buffer was swapped,
-                // and we've already been rescheduled
-                defmt::trace!("pulse skipped due to in-flight buffer swap");
-                return;
-            }
-
+    fn fire_pulse(cx: fire_pulse::Context, now: Instant) {
+        (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
             // load pulse width
             let pulse_width = PulseDuration::from_ticks(PULSE_WIDTH_TICKS.load(Ordering::Relaxed));
 
             // fire timer
             cx.local.pulse_timer.fire(pulse_width);
+
+            // log
             if config::debug::LOG_ALL_PULSES {
                 defmt::println!(
                     "Firing {}.{} us pulse at {} us",
@@ -306,10 +304,17 @@ mod app {
                 );
             }
 
+            // consume this pulse (rescheduling this frequency)
+            if let Err(()) = pulses.try_consume_pulse(now) {
+                defmt::warn!("Pulse was not present in pulse train");
+                return;
+            }
+
             // reschedule ourselves for the next pulse
             if let Some(next_pulse) = pulses.next_pulse(now) {
-                if let Err(_) = fire_pulse::spawn_at(next_pulse, next_pulse) {
-                    defmt::warn!("fire_pulse schedule overrun");
+                match fire_pulse::spawn_at(next_pulse, next_pulse) {
+                    Ok(handle) => *scheduled_pulse = Some(handle),
+                    Err(_) => defmt::warn!("Internal fire_pulse schedule overrun"),
                 }
             }
         });
@@ -329,6 +334,7 @@ mod app {
         binds = DMA1_CHANNEL1,
         shared = [
             pulses,
+            scheduled_pulse,
         ],
         local = [
             adc1_dma_transfer,
@@ -343,7 +349,7 @@ mod app {
         ],
         priority = 14,
     )]
-    fn swap_buffers(mut cx: swap_buffers::Context) {
+    fn swap_buffers(cx: swap_buffers::Context) {
         cx.local.debug_led.set_low();
 
         // getting the timestamp must happen a consistent delay after the start of the task,
@@ -355,28 +361,43 @@ mod app {
         // Note that we still need to start scheduling pulses quickly, however,
         // because delays could result in pulses being scheduled in the past.
 
+        let mut log_timing = {
+            let mut last = start;
+            move |label| {
+                if config::debug::LOG_TIMING {
+                    let now = monotonics::now();
+                    defmt::println!("{} after {}us", label, (now - last).to_micros());
+                    last = now;
+                }
+            }
+        };
+
         // Phase 1: swap in new pulse train and reschedule
 
-        // Step 1: adjust pulses and swap
-        let next_pulse = cx.shared.pulses.lock(|pulses| {
+        (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
+            // Step 1: adjust pulses and swap
             pulses.replace_with_adjusted(cx.local.next_pulses, start);
-            pulses.next_pulse(start)
+
+            // Step 2: compute next pulse
+            let next_pulse = pulses.next_pulse(start);
+
+            // Step 3: cancel existing scheduled next pulse
+            if let Some(handle) = scheduled_pulse.take() {
+                if let Err(e) = handle.cancel() {
+                    defmt::warn!("In-flight pulse could not be cancelled: {}", e);
+                }
+            }
+
+            // Step 4: schedule task for next pulse
+            if let Some(next_pulse) = next_pulse {
+                match fire_pulse::spawn_at(next_pulse, next_pulse) {
+                    Ok(handle) => *scheduled_pulse = Some(handle),
+                    Err(_) => defmt::warn!("External fire_pulse schedule overrun"),
+                }
+            }
         });
 
-        // Step 2: schedule task for next pulse
-        if let Some(next_pulse) = next_pulse {
-            if let Err(_) = fire_pulse::spawn_at(next_pulse, next_pulse) {
-                defmt::warn!("fire_pulse schedule overrun (from swap_buffers2)");
-            }
-        }
-
-        let mid = monotonics::now();
-        if config::debug::LOG_TIMING {
-            defmt::println!(
-                "Finished scheduling new pulses after {}us",
-                (mid - start).to_micros()
-            );
-        }
+        log_timing("Finished swapping in new pulses");
 
         // Phase 2: update current values of controls
 
@@ -387,10 +408,7 @@ mod app {
                 .adc2_controls
                 .read(cx.local.threshold_control_pin)
                 .unwrap_infallible();
-            control::adc_sample_to_value_in_range(
-                sample,
-                config::fft::analysis::AMPLITUDE_THRESHOLD_RANGE,
-            )
+            control::Sample::new(sample)
         };
         let pulse_width = {
             let sample = cx
@@ -398,16 +416,19 @@ mod app {
                 .adc2_controls
                 .read(cx.local.pulse_width_control_pin)
                 .unwrap_infallible();
-            control::adc_sample_to_value_in_range_via(
-                sample,
+            control::Sample::new(sample).to_value_in_range_via(
                 config::pulse::DURATION_RANGE,
                 |d| d.ticks(),
                 PulseDuration::from_ticks,
             )
         };
 
+        log_timing("Finished reading from controls");
+
         // Step 2: store pulse width
         PULSE_WIDTH_TICKS.store(pulse_width.ticks(), Ordering::Relaxed);
+
+        log_timing("Finished storing pulse width");
 
         // Step 3: log control values
         if config::debug::LOG_CONTROL_VALUES {
@@ -429,54 +450,57 @@ mod app {
                 values.try_into().unwrap_infallible();
 
             // Step 0: compute and display amplitude from raw samples
-            let amplitude_factors = indicator::amplitude_scaling_factors(samples);
+            let amplitude_factors = indicator::amplitude(samples);
             for (factor, ch) in amplitude_factors.into_iter().zip([C4, C3, C2, C1]) {
                 let duty = cx.local.amplitude_timer.get_max_duty().scale_by(factor);
                 cx.local.amplitude_timer.set_duty(ch, duty);
             }
 
+            log_timing("Finished computing indicated amplitude");
+
             // Step 1: populate values and padding in FFT scratch buffer
             adc::process_raw_samples(samples, values);
             padding.fill(0);
 
-            // Step 2: apply window function to data
-            fft::window::apply_to(values);
+            log_timing("Finished processing raw samples");
+
+            // Step 2: apply window function and scaling to data
+            fft::window::apply_with_scaling(values);
+
+            log_timing("Finished applying window function");
 
             // Step 3: run fft
             let bins = fft::run(scratch);
+
+            log_timing("Finished FFT");
 
             // Step 4: find peaks in spectrum
             let mut peaks = Vec::new();
             fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
 
+            log_timing("Finished peak detection");
+
             // Step 5: compute pulses based on peaks
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
 
+            log_timing("Finished pulse scheduling");
+
             // Step 6: compute and display "above threshold" from peaks
-            let threshold_factors =
-                indicator::threshold_scaling_factors(&peaks, amplitude_threshold);
+            let threshold_factors = indicator::threshold(&peaks);
             for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
                 cx.local.threshold_timer.set_duty(ch, duty);
             }
+
+            log_timing("Finished computing indicated above threshold");
         });
 
-        let duration = monotonics::now() - mid;
-        match res {
-            Ok(()) => {
-                if config::debug::LOG_TIMING {
-                    defmt::println!(
-                        "Finished processing ADC buffer after {}us.",
-                        duration.to_micros()
-                    );
-                }
-            }
-            Err(_) => {
-                defmt::warn!(
-                    "ADC buffer processing did not complete in time (took {}us).",
-                    duration.to_micros()
-                );
-            }
+        if let Err(_) = res {
+            let duration = monotonics::now() - start;
+            defmt::warn!(
+                "ADC buffer processing did not complete in time (took {} us).",
+                duration.to_micros()
+            );
         }
 
         cx.local.debug_led.set_high();
