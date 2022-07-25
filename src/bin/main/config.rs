@@ -112,16 +112,16 @@ pub mod clk {
     /// Use external oscillator (required to get max 72MHz sysclk)
     pub const HSE_FREQ: Hertz<u32> = Hertz::<u32>::MHz(8);
 
-    /// PLLMUL @ x4 (max 72MHz)
-    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(32);
+    /// PLLMUL @ x6 (max 72MHz)
+    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(48);
     pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
     /// APB1 prescaler @ /16 (max 36MHz)
-    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(2);
-    /// APB2 prescaler @ /8 (max 72MHz)
-    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(4);
+    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(3);
+    /// APB2 prescaler @ /16 (max 72MHz)
+    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(3);
 
     /// TIM1 prescaler @ /1
     pub const TIM1CLK: Hertz<u32> = {
@@ -140,7 +140,7 @@ pub mod clk {
     pub const TIM1CLK_HZ: u32 = TIM1CLK.to_Hz();
 
     /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(2000);
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(1500);
 }
 
 // Prolog for clock config:
