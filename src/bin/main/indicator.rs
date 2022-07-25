@@ -9,9 +9,7 @@ const N: usize = 4;
 
 /// Compute scaling factors for amplitude indicator, based on raw ADC samples.
 #[inline(never)]
-pub fn amplitude_scaling_factors(
-    input: &[u16; config::adc::BUF_LEN_RAW],
-) -> [ScalingFactor<u16>; N] {
+pub fn amplitude(input: &[u16; config::adc::BUF_LEN_RAW]) -> [ScalingFactor<u16>; N] {
     // Step 1: find min and max samples
 
     let mut min_sample = u16::MAX;
@@ -44,19 +42,20 @@ pub fn amplitude_scaling_factors(
     // and then scale up to `0..=max_possible_sample`
     let adjusted_closeness_to_half_max_sample =
         (closeness_to_max_possible_sample - (max_possible_sample / 2)) * 2;
+
     // scale up from ADC sample range to full u16 range
-    let overall_scale_factor = ScalingFactor::from_sample::<{ config::adc::RESOLUTION_BITS }>(
+    let overall_factor = ScalingFactor::from_sample::<{ config::adc::RESOLUTION_BITS }>(
         adjusted_closeness_to_half_max_sample,
     );
 
     // Step 5: distribute scale factor
 
-    overall_scale_factor.distribute()
+    overall_factor.distribute()
 }
 
 /// Compute scaling factors for "above threshold" indicator, based on FFT peaks.
 #[inline(never)]
-pub fn threshold_scaling_factors(
+pub fn threshold(
     peaks: &Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
 ) -> [ScalingFactor<u16>; N] {
     // Step 1: divide peaks found by max possible peaks
@@ -64,9 +63,9 @@ pub fn threshold_scaling_factors(
     let max_peaks: u16 = config::fft::analysis::MAX_PEAKS
         .try_into()
         .unwrap_infallible();
-    let overall_scale_factor = ScalingFactor::from_ratio(peaks.len().truncate(), max_peaks);
+    let overall_factor = ScalingFactor::from_ratio(peaks.len().truncate(), max_peaks);
 
     // Step 2: distribute scale factor
 
-    overall_scale_factor.distribute()
+    overall_factor.distribute()
 }

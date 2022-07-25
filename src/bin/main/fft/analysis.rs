@@ -267,16 +267,13 @@ fn i_to_freq(i: usize) -> u16 {
 /// Represents one peak frequency from the FFT, with frequency and scale factor
 pub struct Peak {
     freq: u16,
-    phase_scale_factor: ScalingFactor<u16>,
+    phase: ScalingFactor<u16>,
 }
 
 impl Peak {
     fn from_bin_and_freq(bin: Complex<i16>, freq: u16) -> Self {
-        let phase_scale_factor = phase(bin);
-        Self {
-            freq,
-            phase_scale_factor,
-        }
+        let phase = phase(bin);
+        Self { freq, phase }
     }
 
     pub fn freq(&self) -> Hertz<u32> {
@@ -289,7 +286,7 @@ impl Peak {
 
     pub fn phase_offset<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {
         let period_ticks = self.period::<DENOM>().ticks();
-        let phase_offset_ticks = period_ticks.scale_by(self.phase_scale_factor);
+        let phase_offset_ticks = period_ticks.scale_by(self.phase);
         Duration::<u32, 1, DENOM>::from_ticks(phase_offset_ticks)
     }
 }

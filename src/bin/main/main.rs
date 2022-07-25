@@ -450,7 +450,7 @@ mod app {
                 values.try_into().unwrap_infallible();
 
             // Step 0: compute and display amplitude from raw samples
-            let amplitude_factors = indicator::amplitude_scaling_factors(samples);
+            let amplitude_factors = indicator::amplitude(samples);
             for (factor, ch) in amplitude_factors.into_iter().zip([C4, C3, C2, C1]) {
                 let duty = cx.local.amplitude_timer.get_max_duty().scale_by(factor);
                 cx.local.amplitude_timer.set_duty(ch, duty);
@@ -486,7 +486,7 @@ mod app {
             log_timing("Finished pulse scheduling");
 
             // Step 6: compute and display "above threshold" from peaks
-            let threshold_factors = indicator::threshold_scaling_factors(&peaks);
+            let threshold_factors = indicator::threshold(&peaks);
             for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);
                 cx.local.threshold_timer.set_duty(ch, duty);
