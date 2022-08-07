@@ -29,8 +29,9 @@ pub fn dump_to_log() {
         - BUF_LEN_PROCESSED: {}\n\
         FFT:\n\
         - WINDOW: {}\n\
-        - BUF_LEN_REAL:    {}\n\
-        - BUF_LEN_COMPLEX: {}\n\
+        - BUF_LEN_REAL:         {}\n\
+        - BUF_LEN_COMPLEX:      {}\n\
+        - BUF_LEN_COMPLEX_REAL: {}\n\
         - FREQ_RESOLUTION: {}.{} Hz (max {}.{} Hz)\n\
         - MAX_FEASIBLE_AMPLITUDE: {}\n\
         FFT analysis:\n\
@@ -71,10 +72,11 @@ pub fn dump_to_log() {
         fft::WINDOW,
         fft::BUF_LEN_REAL,
         fft::BUF_LEN_COMPLEX,
+        fft::BUF_LEN_COMPLEX_REAL,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 / 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
+        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX_REAL / 1000,
+        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX_REAL % 1000,
         fft::MAX_FEASIBLE_AMPLITUDE,
         fft::analysis::MAX_PEAKS,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
@@ -274,6 +276,10 @@ pub mod fft {
 
     /// Complex ADC buffer is half the size, since each `Complex<i16>` holds two samples
     pub const BUF_LEN_COMPLEX: usize = BUF_LEN_REAL / 2;
+
+    /// The part of the complex ADC buffer holding real frequencies is half the size,
+    /// since imaginary frequencies occupy the other half.
+    pub const BUF_LEN_COMPLEX_REAL: usize = BUF_LEN_COMPLEX / 2;
 
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =

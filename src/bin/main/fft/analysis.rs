@@ -19,7 +19,7 @@ const ONE_HZ: NonZeroU16 = match NonZeroU16::new(1) {
 
 #[inline(never)]
 pub fn find_peaks(
-    bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2],
+    bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL],
     amplitude_threshold: control::Sample,
     peaks_out: &mut Vec<Peak, { config::fft::analysis::MAX_PEAKS }>,
 ) {
