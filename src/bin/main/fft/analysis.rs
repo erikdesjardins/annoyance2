@@ -5,11 +5,17 @@ use crate::math::{
     amplitude_sqrt, amplitude_squared, phase, DivRound, ScaleBy, ScalingFactor, Truncate,
 };
 use crate::panic::OptionalExt;
+use core::num::NonZeroU16;
 use fugit::{Duration, Hertz, RateExtU32};
 use heapless::Vec;
 use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
+
+const ONE_HZ: NonZeroU16 = match NonZeroU16::new(1) {
+    Some(f) => f,
+    None => unreachable!(),
+};
 
 #[inline(never)]
 pub fn find_peaks(
@@ -25,7 +31,7 @@ pub fn find_peaks(
         /// Rightmost index of peak, inclusive (samples monotonically decrease from highest point to here)
         right: usize,
         /// Real frequency at the peak, adjusted based on nearby samples
-        freq: u16,
+        freq: NonZeroU16,
     }
 
     let mut peaks: Vec<PeakLoc, { config::fft::analysis::MAX_PEAKS }> = Vec::new();
@@ -108,7 +114,7 @@ pub fn find_peaks(
                 left,
                 right,
                 // computed in the next step
-                freq: 0,
+                freq: ONE_HZ,
             })
             .unwrap_or_else(|_| panic!("too many peaks found (impossible)"));
     }
@@ -199,7 +205,7 @@ pub fn find_peaks(
         // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
         let real_freq: u16 = real_freq.truncate();
         // ensure freq is nonzero
-        let real_freq = real_freq.max(1);
+        let real_freq = NonZeroU16::new(real_freq).unwrap_or(ONE_HZ);
 
         // Step 6: store adjusted frequency
         peak.freq = real_freq;
@@ -266,18 +272,18 @@ fn i_to_freq(i: usize) -> u16 {
 
 /// Represents one peak frequency from the FFT, with frequency and scale factor
 pub struct Peak {
-    freq: u16,
+    freq: NonZeroU16,
     phase: ScalingFactor<u16>,
 }
 
 impl Peak {
-    fn from_bin_and_freq(bin: Complex<i16>, freq: u16) -> Self {
+    fn from_bin_and_freq(bin: Complex<i16>, freq: NonZeroU16) -> Self {
         let phase = phase(bin);
         Self { freq, phase }
     }
 
     pub fn freq(&self) -> Hertz<u32> {
-        u32::from(self.freq).Hz()
+        u32::from(self.freq.get()).Hz()
     }
 
     pub fn period<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {
