@@ -67,6 +67,7 @@ impl ScalingFactor<u16> {
     }
 
     /// Construct a scaling factor from a sample with limited bits.
+    #[track_caller]
     pub const fn from_sample<const BITS: u32>(sample: u16) -> Self {
         assert!(BITS <= u16::BITS);
         debug_assert!((sample as u32) < (1 << BITS));
@@ -75,6 +76,7 @@ impl ScalingFactor<u16> {
     }
 
     /// Construct a scaling factor from a proper fraction.
+    #[track_caller]
     pub const fn from_ratio(num: u16, denom: u16) -> Self {
         assert!(num <= denom);
         let factor = u16::MAX as u32 * num as u32 / denom as u32;
@@ -143,8 +145,14 @@ macro_rules! impl_truncate {
         const _: () = assert!(<$to>::BITS <= <$from>::BITS);
 
         impl Truncate<$to> for $from {
+            #[track_caller]
             fn truncate(self) -> $to {
-                debug_assert!(self <= <$to>::MAX as $from);
+                debug_assert!(
+                    self <= <$to>::MAX as $from,
+                    "expected {} <= {}",
+                    self,
+                    <$to>::MAX
+                );
                 #[allow(clippy::cast_possible_truncation)]
                 let truncated = self as $to;
                 truncated
