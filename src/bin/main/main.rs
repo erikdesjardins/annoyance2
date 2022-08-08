@@ -474,18 +474,23 @@ mod app {
 
             log_timing("Finished FFT");
 
-            // Step 4: find peaks in spectrum
+            // Step 4: run equalizer
+            fft::equalizer::apply_to(bins);
+
+            log_timing("Finished equalizer");
+
+            // Step 5: find peaks in spectrum
             let mut peaks = Vec::new();
             fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
 
             log_timing("Finished peak detection");
 
-            // Step 5: compute pulses based on peaks
+            // Step 6: compute pulses based on peaks
             pulse::schedule_pulses(&peaks, cx.local.next_pulses);
 
             log_timing("Finished pulse scheduling");
 
-            // Step 6: compute and display "above threshold" from peaks
+            // Step 7: compute and display "above threshold" from peaks
             let threshold_factors = indicator::threshold(&peaks);
             for (factor, ch) in threshold_factors.into_iter().zip([C1, C2, C3, C4]) {
                 let duty = cx.local.threshold_timer.get_max_duty().scale_by(factor);

@@ -5,6 +5,7 @@ use core::mem;
 use num_complex::Complex;
 
 pub mod analysis;
+pub mod equalizer;
 mod imp;
 pub mod window;
 
