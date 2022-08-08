@@ -462,6 +462,8 @@ mod app {
             adc::process_raw_samples(samples, values);
             padding.fill(0);
 
+            adc::log_last_few_samples(values);
+
             log_timing("Finished processing raw samples");
 
             // Step 2: apply window function and scaling to data
@@ -477,11 +479,15 @@ mod app {
             // Step 4: run equalizer
             fft::equalizer::apply_to(bins);
 
+            fft::log_amplitudes(bins);
+
             log_timing("Finished equalizer");
 
             // Step 5: find peaks in spectrum
             let mut peaks = Vec::new();
             fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
+
+            fft::analysis::log_peaks(&peaks);
 
             log_timing("Finished peak detection");
 

@@ -32,8 +32,9 @@ pub fn dump_to_log() {
         - BUF_LEN_REAL:         {}\n\
         - BUF_LEN_COMPLEX:      {}\n\
         - BUF_LEN_COMPLEX_REAL: {}\n\
-        - FREQ_RESOLUTION: {}.{} Hz (max {}.{} Hz)\n\
-        - MAX_FEASIBLE_AMPLITUDE: {}\n\
+        - FREQ_RESOLUTION: {}.{} Hz\n\
+        - MAX_FREQ: {} Hz\n\
+        - MAX_AMPLITUDE: {}\n\
         FFT analysis:\n\
         - MAX_PEAKS: {}\n\
         - NOISE_FLOOR_AMPLITUDE: {}\n\
@@ -75,9 +76,8 @@ pub fn dump_to_log() {
         fft::BUF_LEN_COMPLEX_REAL,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX_REAL / 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX_REAL % 1000,
-        fft::MAX_FEASIBLE_AMPLITUDE,
+        fft::MAX_FREQ,
+        fft::MAX_AMPLITUDE,
         fft::analysis::MAX_PEAKS,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
         indicator::PWM_FREQ.to_Hz(),
@@ -285,8 +285,11 @@ pub mod fft {
     pub const FREQ_RESOLUTION_X1000: usize =
         10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
 
+    /// Frequency of the maximum FFT bin
+    pub const MAX_FREQ: u16 = (FREQ_RESOLUTION_X1000 * BUF_LEN_COMPLEX_REAL / 1000) as u16;
+
     /// Maximum feasible amplitude of an FFT peak.
-    pub const MAX_FEASIBLE_AMPLITUDE: u16 = {
+    pub const MAX_AMPLITUDE: u16 = {
         // samples are scaled up to full i16 range, allowing a potential amplitude of all 16 bits
         let amplitude = u16::MAX;
         // amplitude is scaled down by zeroed padding added to samples

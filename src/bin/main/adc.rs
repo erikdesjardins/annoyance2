@@ -34,12 +34,14 @@ pub fn process_raw_samples(
     if config::debug::FAKE_INPUT_DATA {
         output.copy_from_slice(&FAKE_COS_TABLE);
     }
+}
 
+pub fn log_last_few_samples(samples: &[i16; config::adc::BUF_LEN_PROCESSED]) {
     if config::debug::LOG_LAST_FEW_SAMPLES {
         defmt::println!(
             "ADC samples (last {}): {}",
             config::debug::LOG_LAST_N_SAMPLES,
-            output[output.len() - config::debug::LOG_LAST_N_SAMPLES..]
+            samples[samples.len() - config::debug::LOG_LAST_N_SAMPLES..]
         );
     }
 }

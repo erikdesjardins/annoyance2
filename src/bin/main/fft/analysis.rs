@@ -236,50 +236,41 @@ pub fn find_peaks(
     peaks_out.replace_with_mapped(&peaks, |peak| {
         Peak::from_bin_and_freq(bins[peak.i], peak.freq)
     });
+}
 
-    // Phase 5: log peaks
-
+pub fn log_peaks(peaks: &[Peak]) {
     if config::debug::LOG_FFT_PEAKS {
-        for peak in &peaks {
-            let bin = bins[peak.i];
-            let amplitude = amplitude_sqrt(amplitude_squared(bin));
-            let phase_deg = 360.scale_by(phase(bin));
-
-            let peak_freq = peak.freq;
-            let center_freq = i_to_freq(peak.i);
-            let left_freq = i_to_freq(peak.left);
-            let right_freq = i_to_freq(peak.right);
-
+        for peak in peaks {
             defmt::println!(
-                "Peak amplitude = {} @ freq = {} (mid {}, lo {}, hi {}) Hz, phase = {} deg",
-                amplitude,
-                peak_freq,
-                center_freq,
-                left_freq,
-                right_freq,
-                phase_deg,
+                "Peak amplitude = {}, freq = {}, phase = {} deg",
+                peak.amplitude(),
+                peak.freq().to_Hz(),
+                360.scale_by(peak.phase()),
             );
         }
     }
 }
 
-fn i_to_freq(i: usize) -> u16 {
-    let freq = (i * config::fft::FREQ_RESOLUTION_X1000).div_round(1000);
-    // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
-    let freq: u16 = freq.truncate();
-    freq
-}
-
 /// Represents one peak frequency from the FFT, with frequency and scale factor
 pub struct Peak {
+    amplitude: u16,
     freq: NonZeroU16,
     phase: ScalingFactor<u16>,
 }
 
 impl Peak {
     fn from_bin_and_freq(bin: Complex<i16>, freq: NonZeroU16) -> Self {
+        let amplitude = amplitude_sqrt(amplitude_squared(bin));
         let phase = phase(bin);
-        Self { freq, phase }
+        Self {
+            amplitude,
+            freq,
+            phase,
+        }
+    }
+
+    pub fn amplitude(&self) -> u16 {
+        self.amplitude
     }
 
     pub fn freq(&self) -> Hertz<u32> {
@@ -288,6 +279,10 @@ impl Peak {
 
     pub fn period<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {
         self.freq().into_duration()
+    }
+
+    pub fn phase(&self) -> ScalingFactor<u16> {
+        self.phase
     }
 
     pub fn phase_offset<const DENOM: u32>(&self) -> Duration<u32, 1, DENOM> {

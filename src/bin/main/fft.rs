@@ -16,19 +16,22 @@ pub mod window;
 /// - index N/2 to N: negative frequencies (generally can be ignored)
 pub fn run(
     samples: &mut [i16; config::fft::BUF_LEN_REAL],
-) -> &[Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL] {
+) -> &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL] {
     let bins = complex_from_adjacent_values(samples);
 
     imp::radix2(bins);
 
     // ignore bins N/2 to N (negative frequencies)
-    let bins: &[_; config::fft::BUF_LEN_COMPLEX_REAL] = bins[..config::fft::BUF_LEN_COMPLEX_REAL]
-        .try_into()
-        .unwrap_infallible();
+    let (bins, _) = bins.split_at_mut(config::fft::BUF_LEN_COMPLEX_REAL);
+    let bins: &mut [_; config::fft::BUF_LEN_COMPLEX_REAL] = bins.try_into().unwrap_infallible();
 
+    bins
+}
+
+pub fn log_amplitudes(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL]) {
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
         let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX_REAL];
-        for (amp, bin) in amplitudes.iter_mut().zip(bins) {
+        for (amp, bin) in amplitudes.iter_mut().zip(&*bins) {
             *amp = amplitude_sqrt(amplitude_squared(*bin));
         }
         defmt::println!(
@@ -39,8 +42,6 @@ pub fn run(
             amplitudes
         );
     }
-
-    bins
 }
 
 fn complex_from_adjacent_values<T>(
