@@ -28,7 +28,7 @@ pub fn apply_to(bins: &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL]) {
         // Also, it seems that this approximation isn't perfect. If we instead (to prevent bad behavior at the endpoints)
         // enforce a maximum to scale up by, but use the full range, we end up scaling amplitudes too much,
         // even at middle frequencies.
-        let range_compression = ScalingFactor::from_ratio(15, 16);
+        let range_compression = ScalingFactor::from_ratio(7, 8);
 
         // Compute the response, starting with MAX_AMPLITUDE at 0 Hz, and decreasing as we get closer to MAX_FREQ.
         let freq_response_at_this_point = config::fft::MAX_AMPLITUDE
