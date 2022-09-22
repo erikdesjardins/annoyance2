@@ -31,7 +31,7 @@ pub fn run(
 pub fn log_amplitudes(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL]) {
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
         let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX_REAL];
-        for (amp, bin) in amplitudes.iter_mut().zip(&*bins) {
+        for (amp, bin) in amplitudes.iter_mut().zip(bins) {
             *amp = amplitude_sqrt(amplitude_squared(*bin));
         }
         defmt::println!(

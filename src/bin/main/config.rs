@@ -288,6 +288,7 @@ pub mod fft {
         10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
 
     /// Frequency of the maximum FFT bin
+    #[allow(clippy::cast_possible_truncation)]
     pub const MAX_FREQ: u16 = (FREQ_RESOLUTION_X1000 * BUF_LEN_COMPLEX_REAL / 1000) as u16;
 
     /// Maximum feasible amplitude of an FFT peak.
