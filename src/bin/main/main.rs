@@ -38,6 +38,7 @@ mod time;
 mod app {
     use crate::config;
     use crate::fft;
+    use crate::fft::analysis::ScratchPeak;
     use crate::hal::pins;
     use crate::hal::tim::{OnePulse, OneshotTimer};
     use crate::indicator;
@@ -76,6 +77,7 @@ mod app {
             AdcDma<ADC1, pins::A0_ADC1C0, Continuous, dma1::C1>,
         >,
         fft_buf: &'static mut [i16; config::fft::BUF_LEN_REAL],
+        fft_scratch: &'static mut Vec<ScratchPeak, { config::fft::analysis::MAX_SCRATCH_PEAKS }>,
         next_pulses: &'static mut UnadjustedPulses,
         adc2_controls: Adc<ADC2>,
         threshold_control_pin: pins::A2_ADC2C2,
@@ -226,6 +228,10 @@ mod app {
             singleton!(: [i16; config::fft::BUF_LEN_REAL] = [0; config::fft::BUF_LEN_REAL])
                 .unwrap();
 
+        let fft_scratch =
+            singleton!(: Vec<ScratchPeak, { config::fft::analysis::MAX_SCRATCH_PEAKS }> = Vec::new())
+                .unwrap();
+
         let pulses = singleton!(: Pulses = Pulses::new()).unwrap();
 
         let next_pulses = singleton!(: UnadjustedPulses = UnadjustedPulses::new()).unwrap();
@@ -244,6 +250,7 @@ mod app {
             Local {
                 adc1_dma_transfer,
                 fft_buf,
+                fft_scratch,
                 next_pulses,
                 adc2_controls,
                 threshold_control_pin,
@@ -339,6 +346,7 @@ mod app {
         local = [
             adc1_dma_transfer,
             fft_buf,
+            fft_scratch,
             next_pulses,
             adc2_controls,
             threshold_control_pin,
@@ -485,7 +493,7 @@ mod app {
 
             // Step 5: find peaks in spectrum
             let mut peaks = Vec::new();
-            fft::analysis::find_peaks(bins, amplitude_threshold, &mut peaks);
+            fft::analysis::find_peaks(bins, cx.local.fft_scratch, amplitude_threshold, &mut peaks);
 
             fft::analysis::log_peaks(&peaks);
 

@@ -9,8 +9,9 @@ pub fn dump_to_log() {
         - LOG_CONTROL_VALUES: {}\n\
         - LOG_LAST_FEW_SAMPLES: {}\n\
         - LOG_LAST_N_SAMPLES:   {}\n\
-        - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_FFT_AMPLITUDES: {}\n\
+        - LOG_FFT_SCRATCH_PEAKS: {}\n\
+        - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_PULSES: {}\n\
         Clocks:\n\
         - HSE_FREQ: {} Hz\n\
@@ -52,8 +53,9 @@ pub fn dump_to_log() {
         debug::LOG_CONTROL_VALUES,
         debug::LOG_LAST_FEW_SAMPLES,
         debug::LOG_LAST_N_SAMPLES,
-        debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_FFT_AMPLITUDES,
+        debug::LOG_FFT_SCRATCH_PEAKS,
+        debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_PULSES,
         clk::HSE_FREQ.to_Hz(),
         clk::SYSCLK.to_Hz(),
@@ -308,13 +310,22 @@ pub mod fft {
     };
 
     pub mod analysis {
-        /// Maximum number of peaks to find in the FFT spectrum.
+        use crate::config;
+
+        /// Maximum number of possible "scratch peaks" that could occur in the raw FFT spectrum.
+        pub const MAX_SCRATCH_PEAKS: usize = {
+            // Worst case is a zigzag that starts or ends with a peak, e.g. for 4 buckets
+            // . .
+            //  . .
+            config::fft::BUF_LEN_COMPLEX_REAL / 2
+        };
+
+        /// Maximum number of above-threshold peaks to find in the FFT spectrum.
         pub const MAX_PEAKS: usize = 8;
 
         /// Min amplitude for a FFT bin to be considered a peak.
         /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
         pub const NOISE_FLOOR_AMPLITUDE: u16 = 100;
-        pub const NOISE_FLOOR_AMPLITUDE_SQUARED: u32 = (NOISE_FLOOR_AMPLITUDE as u32).pow(2);
     }
 }
 
