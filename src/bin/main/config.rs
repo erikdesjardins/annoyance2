@@ -37,6 +37,7 @@ pub fn dump_to_log() {
         - MAX_FREQ: {} Hz\n\
         - MAX_AMPLITUDE: {}\n\
         FFT analysis:\n\
+        - MAX_SCRATCH_PEAKS: {}\n\
         - MAX_PEAKS: {}\n\
         - NOISE_FLOOR_AMPLITUDE: {}\n\
         Indicator LEDs:\n\
@@ -80,6 +81,7 @@ pub fn dump_to_log() {
         fft::FREQ_RESOLUTION_X1000 % 1000,
         fft::MAX_FREQ,
         fft::MAX_AMPLITUDE,
+        fft::analysis::MAX_SCRATCH_PEAKS,
         fft::analysis::MAX_PEAKS,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
         indicator::PWM_FREQ.to_Hz(),
@@ -315,10 +317,10 @@ pub mod fft {
 
         /// Maximum number of possible "scratch peaks" that could occur in the raw FFT spectrum.
         pub const MAX_SCRATCH_PEAKS: usize = {
-            // Worst case is a zigzag that starts or ends with a peak, e.g. for 4 buckets
+            // Worst case is a zigzag that starts or ends with a peak, e.g. for 3 or 4 buckets
             // . .
             //  . .
-            config::fft::BUF_LEN_COMPLEX_REAL / 2
+            (config::fft::BUF_LEN_COMPLEX_REAL + 1) / 2
         };
 
         /// Maximum number of above-threshold peaks to find in the FFT spectrum.
