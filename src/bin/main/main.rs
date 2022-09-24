@@ -485,12 +485,14 @@ mod app {
 
             log_timing("Finished FFT");
 
-            // Step 4: run equalizer
-            fft::equalizer::apply_to(bins);
+            if config::fft::EQUALIZATION {
+                // Step 4: run equalizer
+                fft::equalizer::apply_to(bins);
+
+                log_timing("Finished equalizer");
+            }
 
             fft::log_amplitudes(bins);
-
-            log_timing("Finished equalizer");
 
             // Step 5: find peaks in spectrum
             let mut peaks = Vec::new();

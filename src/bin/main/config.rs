@@ -34,6 +34,7 @@ pub fn dump_to_log() {
         - BUF_LEN_COMPLEX:      {}\n\
         - BUF_LEN_COMPLEX_REAL: {}\n\
         - FREQ_RESOLUTION: {}.{} Hz\n\
+        - EQUALIZATION: {}\n\
         - MAX_FREQ: {} Hz\n\
         - MAX_AMPLITUDE: {}\n\
         FFT analysis:\n\
@@ -79,6 +80,7 @@ pub fn dump_to_log() {
         fft::BUF_LEN_COMPLEX_REAL,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
+        fft::EQUALIZATION,
         fft::MAX_FREQ,
         fft::MAX_AMPLITUDE,
         fft::analysis::MAX_SCRATCH_PEAKS,
@@ -288,6 +290,9 @@ pub mod fft {
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
         10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
+
+    /// Whether to amplify high frequencies to offset the FFT's non-flat frequency response
+    pub const EQUALIZATION: bool = true;
 
     /// Frequency of the maximum FFT bin
     #[allow(clippy::cast_possible_truncation)]
