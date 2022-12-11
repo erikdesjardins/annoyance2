@@ -45,6 +45,7 @@ jobs:
     - run: cargo build --release --manifest-path firmware/Cargo.toml --target thumbv7m-none-eabi
     - run: ls -lh firmware/target/thumbv7m-none-eabi/release/firmware
     - run: cargo build --release --manifest-path visualizer/Cargo.toml --target x86_64-unknown-linux-musl
+    - run: strip visualizer/target/x86_64-unknown-linux-musl/release/visualizer
     - run: ls -lh visualizer/target/x86_64-unknown-linux-musl/release/visualizer
 
     - uses: softprops/action-gh-release@v1
