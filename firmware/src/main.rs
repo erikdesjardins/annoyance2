@@ -17,7 +17,17 @@
     clippy::ptr_as_ptr
 )]
 
-use annoyance2 as _; // global logger + panicking-behavior + memory layout
+use defmt_rtt as _; // global logger
+use stm32f1xx_hal as _; // memory layout
+
+use panic_probe as _; // panicking-behavior
+
+// same panicking *behavior* as `panic-probe` but doesn't print a panic message
+// this prevents the panic message being printed *twice* when `defmt::panic` is invoked
+#[defmt::panic_handler]
+fn panic() -> ! {
+    cortex_m::asm::udf()
+}
 
 mod adc;
 mod collections;

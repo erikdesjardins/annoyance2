@@ -29,19 +29,12 @@ https://probe.rs/docs/getting-started/probe-setup/
 ```sh
 # use `debug` or `trace` for more info
 set DEFMT_LOG=info
-cargo watch --clear --delay 1 --exec "run --bin main"
+
+cargo run --manifest-path firmware/Cargo.toml --target thumbv7m-none-eabi
 ```
 
 ### Misc
 
 ```
 cargo objdump --release --bin main -- --disassemble --no-show-raw-insn --print-imm-hex
-```
-
-## Testing
-
-See https://crates.io/crates/defmt-test.
-
-```sh
-cargo test -p testsuite
 ```
