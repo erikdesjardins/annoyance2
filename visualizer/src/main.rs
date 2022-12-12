@@ -4,9 +4,7 @@ use crossterm::terminal::{
 };
 use crossterm::{event, execute};
 use std::io::{self, BufRead};
-use std::process::exit;
 use std::thread;
-use std::time::Duration;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
@@ -50,15 +48,13 @@ fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
 
                 fn run() -> Result<(), io::Error> {
                     loop {
-                        if event::poll(Duration::from_secs(365 * 86400))? {
-                            if let Event::Key(key) = event::read()? {
-                                let ctrl_c = key.modifiers == KeyModifiers::CONTROL
-                                    && key.code == KeyCode::Char('c');
-                                let q = key.modifiers == KeyModifiers::NONE
-                                    && key.code == KeyCode::Char('q');
-                                if ctrl_c || q {
-                                    return Ok(());
-                                }
+                        if let Event::Key(key) = event::read()? {
+                            let ctrl_c = key.modifiers == KeyModifiers::CONTROL
+                                && key.code == KeyCode::Char('c');
+                            let q = key.modifiers == KeyModifiers::NONE
+                                && key.code == KeyCode::Char('q');
+                            if ctrl_c || q {
+                                return Ok(());
                             }
                         }
                     }
@@ -73,7 +69,7 @@ fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
                 }
             };
 
-            exit(status);
+            std::process::exit(status);
         });
 
         let mut state = State::default();
