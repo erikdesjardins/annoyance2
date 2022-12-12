@@ -29,11 +29,28 @@ impl State {
         &self.logs
     }
 
-    pub fn push_log(&mut self, log: String) {
-        if self.logs.len() >= config::SCROLLBACK_LINES {
-            self.logs.pop_front();
-        }
-        self.logs.push_back(log);
+    pub fn push_log(&mut self, log: &str) {
+        let log = if log.len() > config::MAX_LINE_LENGTH {
+            &log[0..config::MAX_LINE_LENGTH]
+        } else {
+            log
+        };
+
+        let string = if self.logs.len() >= config::SCROLLBACK_LINES {
+            // Reuse existing string allocation
+            match self.logs.pop_front() {
+                Some(mut existing_string) => {
+                    existing_string.clear();
+                    existing_string.push_str(log);
+                    existing_string
+                }
+                None => unreachable!("cannot be empty"),
+            }
+        } else {
+            // Not full yet, allocate new string
+            log.to_string()
+        };
+        self.logs.push_back(string);
     }
 }
 

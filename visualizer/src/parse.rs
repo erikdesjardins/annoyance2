@@ -96,10 +96,10 @@ pub fn handle_line(state: &mut State, line: &str) -> Redraw {
     match parse_command(state, line) {
         Ok(r) => r,
         Err(e) => {
-            state.push_log(line.to_string());
+            state.push_log(line);
             match e {
                 ParseError::NotACommand => {}
-                ParseError::InvalidFloat(e) => state.push_log(format!("Error: {:?}", e)),
+                ParseError::InvalidFloat(e) => state.push_log(&format!("Error: {:?}", e)),
             }
             Redraw::Yes
         }
