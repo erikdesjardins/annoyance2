@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+atty = "0.2"
+crossterm = { version = "0.25", default-features = false }
+tui = { version = "0.19", default-features = false, features = ['crossterm'] }
 
 [profile.release]
 panic = "abort"
