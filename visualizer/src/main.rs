@@ -36,13 +36,10 @@ fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
         return Ok(());
     }
 
-    let mut stdout = io::stdout();
+    let stdout = io::stdout();
     let mut stdin = io::stdin().lock();
 
-    enable_raw_mode()?;
-    defer! { let _ = disable_raw_mode(); }
-    execute!(stdout, EnterAlternateScreen)?;
-    defer! { let _ = execute!(&stdout, LeaveAlternateScreen); }
+    let mut terminal = Terminal::new(CrosstermBackend::new(&stdout))?;
 
     thread::scope(|s| {
         // spawn a background thread to handle user input (for exiting)
@@ -79,26 +76,40 @@ fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
             exit(status);
         });
 
-        let backend = CrosstermBackend::new(&stdout);
-        let mut terminal = Terminal::new(backend)?;
-
-        terminal.hide_cursor()?;
-
         let mut state = State::default();
         let mut line = String::new();
-        loop {
-            line.clear();
-            let read = stdin.read_line(&mut line)?;
-            if read == 0 {
-                // input stream closed
-                return Ok(());
-            }
 
+        // Wait for first line of input before we switch to the alt screen.
+        // This helps in situations like `cargo run firmware | cargo run visualizer`,
+        // where the firmware is still building (and hence writing to the screen),
+        // so it doesn't stomp on the graph.
+        if stdin.read_line(&mut line)? == 0 {
+            // input stream closed
+            return Ok(());
+        }
+
+        // We've seen our first line of input--switch to the alt screen and start rendering.
+        enable_raw_mode()?;
+        defer! { let _ = disable_raw_mode(); }
+        execute!(&stdout, EnterAlternateScreen)?;
+        defer! { let _ = execute!(&stdout, LeaveAlternateScreen); }
+        terminal.hide_cursor()?;
+
+        loop {
+            // Parse line
             let redraw = parse::handle_line(&mut state, &line);
 
+            // Redraw if requested
             match redraw {
                 Redraw::No => {}
                 Redraw::Yes => terminal::draw(&state, &mut terminal)?,
+            }
+
+            // Read next line
+            line.clear();
+            if stdin.read_line(&mut line)? == 0 {
+                // input stream closed
+                return Ok(());
             }
         }
     })

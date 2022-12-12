@@ -68,7 +68,6 @@ pub fn handle_line(state: &mut State, line: &str) -> Redraw {
             }
             ".vz ys " => {
                 // Must provide Y coords second
-
                 let arguments = arguments.trim_start_matches('[');
                 let arguments = arguments.trim_end_matches(']');
                 let ys = arguments.split(',');
