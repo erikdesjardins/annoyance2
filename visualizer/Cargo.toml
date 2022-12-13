@@ -8,7 +8,18 @@ atty = "0.2"
 crossterm = { version = "0.25", default-features = false }
 tui = { version = "0.19", default-features = false, features = ['crossterm'] }
 
+[dev-dependencies]
+criterion = "0.4"
+
 [profile.release]
 panic = "abort"
 lto = true
 codegen-units = 1
+
+[profile.bench]
+lto = true
+codegen-units = 1
+
+[[bench]]
+name = "parse"
+harness = false

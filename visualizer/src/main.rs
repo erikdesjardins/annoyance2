@@ -7,18 +7,11 @@ use std::io::{self, BufRead};
 use std::thread;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
-
-use crate::state::State;
-use crate::terminal::Redraw;
-
-#[macro_use]
-mod defer;
-
-mod config;
-mod err;
-mod parse;
-mod state;
-mod terminal;
+use visualizer::defer;
+use visualizer::err;
+use visualizer::parse;
+use visualizer::state::State;
+use visualizer::terminal::{self, Redraw};
 
 fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
     if atty::is(atty::Stream::Stdin) {

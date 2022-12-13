@@ -1,8 +1,9 @@
 use std::mem::ManuallyDrop;
 
+#[macro_export]
 macro_rules! defer {
     ($f:stmt ;) => {
-        let _x = crate::defer::Defer(::std::mem::ManuallyDrop::new(
+        let _x = $crate::defer::Defer(::std::mem::ManuallyDrop::new(
             #[allow(redundant_semicolons)]
             || {
                 $f;
@@ -11,7 +12,8 @@ macro_rules! defer {
     };
 }
 
-pub(crate) struct Defer<F: FnOnce()>(pub(crate) ManuallyDrop<F>);
+#[doc(hidden)]
+pub struct Defer<F: FnOnce()>(pub ManuallyDrop<F>);
 
 impl<F: FnOnce()> Drop for Defer<F> {
     fn drop(&mut self) {
