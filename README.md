@@ -33,6 +33,12 @@ set DEFMT_LOG=info
 cargo run --manifest-path firmware/Cargo.toml --target thumbv7m-none-eabi
 ```
 
+### Run with visualizer
+
+```sh
+cargo run --manifest-path firmware/Cargo.toml --target thumbv7m-none-eabi --release | cargo run --manifest-path visualizer/Cargo.toml --release
+```
+
 ### Misc
 
 ```
