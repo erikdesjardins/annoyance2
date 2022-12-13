@@ -51,9 +51,7 @@ fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
                         if let Event::Key(key) = event::read()? {
                             let ctrl_c = key.modifiers == KeyModifiers::CONTROL
                                 && key.code == KeyCode::Char('c');
-                            let q = key.modifiers == KeyModifiers::NONE
-                                && key.code == KeyCode::Char('q');
-                            if ctrl_c || q {
+                            if ctrl_c {
                                 return Ok(());
                             }
                         }
