@@ -111,15 +111,7 @@ pub fn find_peaks(
             left = right;
         }
 
-        if config::debug::LOG_FFT_SCRATCH_PEAKS {
-            let mut is_scratch_peak = [0u8; config::fft::BUF_LEN_COMPLEX_REAL];
-            for peak in scratch_peaks.iter() {
-                if let Some(i) = peak.i() {
-                    is_scratch_peak[i] = 1;
-                }
-            }
-            defmt::println!("FFT scratch peaks: {}", is_scratch_peak);
-        }
+        log_scratch_peaks(&scratch_peaks);
     }
 
     // Phase 2: extract and process highest peaks
@@ -286,6 +278,32 @@ pub fn find_peaks(
                 .push(Peak::from_bin_and_freq(bins[max_peak_i], freq))
                 .unwrap_or_else(|_| panic!("too many peaks found (impossible)"));
         }
+    }
+}
+
+pub fn log_scratch_peaks_prelude() {
+    if config::debug::LOG_FFT_SCRATCH_PEAKS {
+        defmt::println!(".vz 2 cn FFT Scratch Peaks");
+        defmt::println!(".vz 2 xn Frequency (Hz)");
+        let mut freqs = [0u16; config::fft::BUF_LEN_COMPLEX_REAL];
+        for (i, freq) in freqs.iter_mut().enumerate() {
+            *freq = (config::fft::FREQ_RESOLUTION_X1000 * i / 1000).truncate();
+        }
+        defmt::println!(".vz 2 xs {}", freqs);
+    }
+}
+
+pub fn log_scratch_peaks(
+    scratch_peaks: &Vec<ScratchPeak, { config::fft::analysis::MAX_SCRATCH_PEAKS }>,
+) {
+    if config::debug::LOG_FFT_SCRATCH_PEAKS {
+        let mut is_scratch_peak = [0u8; config::fft::BUF_LEN_COMPLEX_REAL];
+        for peak in scratch_peaks.iter() {
+            if let Some(i) = peak.i() {
+                is_scratch_peak[i] = 1;
+            }
+        }
+        defmt::println!(".vz 2 ys {}", is_scratch_peak);
     }
 }
 

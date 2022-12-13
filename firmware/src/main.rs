@@ -128,6 +128,7 @@ mod app {
 
         adc::log_last_few_samples_prelude();
         fft::log_amplitudes_prelude();
+        fft::analysis::log_scratch_peaks_prelude();
 
         defmt::info!("Starting init...");
 
