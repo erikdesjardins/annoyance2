@@ -111,7 +111,7 @@ pub fn find_peaks(
             left = right;
         }
 
-        log_scratch_peaks(&scratch_peaks);
+        log_scratch_peaks(scratch_peaks);
     }
 
     // Phase 2: extract and process highest peaks
