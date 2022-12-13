@@ -8,7 +8,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::symbols::Marker;
 use tui::text::Span;
 use tui::widgets::{Axis, Block, Borders, Chart, Dataset, Widget};
-use tui::Terminal;
+use tui::{Frame, Terminal};
 
 #[derive(Copy, Clone)]
 pub enum Redraw {
@@ -18,22 +18,41 @@ pub enum Redraw {
 
 pub fn draw(state: &State, terminal: &mut Terminal<impl Backend>) -> Result<(), io::Error> {
     terminal.draw(|f| {
-        let size = f.size();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(size);
+            .split(f.size());
 
+        draw_charts(state, f, chunks[0]);
+        draw_log(state, f, chunks[1]);
+    })?;
+
+    Ok(())
+}
+
+fn draw_charts(state: &State, f: &mut Frame<impl Backend>, area: Rect) {
+    let charts = state.charts();
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![
+            Constraint::Ratio(1, charts.len() as u32);
+            charts.len()
+        ])
+        .split(area);
+
+    for (chart, area) in charts.zip(chunks) {
         let dataset = Dataset::default()
-            .name(&state.series_name)
+            .name(&chart.series_name)
             .marker(Marker::Dot)
             .style(Style::default().fg(Color::Cyan))
-            .data(&state.coords);
+            .data(&chart.coords);
+
         let chart = Chart::new(vec![dataset])
             .block(
                 Block::default()
                     .title(Span::styled(
-                        &state.chart_name,
+                        &chart.chart_name,
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
@@ -42,76 +61,79 @@ pub fn draw(state: &State, terminal: &mut Terminal<impl Backend>) -> Result<(), 
             )
             .x_axis(
                 Axis::default()
-                    .title(state.x_axis.name.as_str())
+                    .title(chart.x_axis.name.as_str())
                     .style(Style::default().fg(Color::Gray))
                     .labels(vec![
                         Span::styled(
-                            state.x_axis.range.min_name(),
+                            chart.x_axis.range.min_name(),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                         Span::styled(
-                            state.x_axis.range.max_name(),
+                            chart.x_axis.range.max_name(),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                     ])
-                    .bounds([state.x_axis.range.min(), state.x_axis.range.max()]),
+                    .bounds([chart.x_axis.range.min(), chart.x_axis.range.max()]),
             )
             .y_axis(
                 Axis::default()
-                    .title(state.y_axis.name.as_str())
+                    .title(chart.y_axis.name.as_str())
                     .style(Style::default().fg(Color::Gray))
                     .labels(vec![
                         Span::styled(
-                            state.y_axis.range.min_name(),
+                            chart.y_axis.range.min_name(),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                         Span::styled(
-                            state.y_axis.range.max_name(),
+                            chart.y_axis.range.max_name(),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                     ])
-                    .bounds([state.y_axis.range.min(), state.y_axis.range.max()]),
+                    .bounds([chart.y_axis.range.min(), chart.y_axis.range.max()]),
             );
-        f.render_widget(chart, chunks[0]);
 
-        struct LogWidget<'a> {
-            logs: &'a VecDeque<String>,
-        }
-        impl<'a> Widget for LogWidget<'a> {
-            fn render(self, area: Rect, buf: &mut Buffer) {
-                let block = Block::default()
-                    .title(Span::styled(
-                        "Log",
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL);
+        f.render_widget(chart, area);
+    }
+}
 
-                let area = {
-                    let a = block.inner(area);
-                    block.render(area, buf);
-                    a
-                };
+fn draw_log(state: &State, f: &mut Frame<impl Backend>, area: Rect) {
+    struct LogWidget<'a> {
+        logs: &'a VecDeque<String>,
+    }
 
-                for (i, log) in self
-                    .logs
-                    .iter()
-                    .rev()
-                    .take(area.height as usize)
-                    .enumerate()
-                {
-                    buf.set_string(
-                        area.left(),
-                        area.bottom() - 1 - i as u16,
-                        log,
-                        Style::default(),
-                    );
-                }
+    impl<'a> Widget for LogWidget<'a> {
+        fn render(self, area: Rect, buf: &mut Buffer) {
+            let block = Block::default()
+                .title(Span::styled(
+                    "Log",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .borders(Borders::ALL);
+
+            let area = {
+                let a = block.inner(area);
+                block.render(area, buf);
+                a
+            };
+
+            for (i, log) in self
+                .logs
+                .iter()
+                .rev()
+                .take(area.height as usize)
+                .enumerate()
+            {
+                buf.set_string(
+                    area.left(),
+                    area.bottom() - 1 - i as u16,
+                    log,
+                    Style::default(),
+                );
             }
         }
-        f.render_widget(LogWidget { logs: state.logs() }, chunks[1]);
-    })?;
+    }
 
-    Ok(())
+    f.render_widget(LogWidget { logs: state.logs() }, area);
 }

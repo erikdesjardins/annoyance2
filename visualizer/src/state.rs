@@ -3,28 +3,39 @@ use std::collections::VecDeque;
 use std::fmt::Write;
 
 pub struct State {
-    pub chart_name: String,
-    pub series_name: String,
-    pub x_axis: Axis,
-    pub y_axis: Axis,
-    pub coords: Vec<(f64, f64)>,
+    charts: Vec<(i32, Chart)>,
     logs: VecDeque<String>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            chart_name: Default::default(),
-            series_name: Default::default(),
-            x_axis: Default::default(),
-            y_axis: Default::default(),
-            coords: Default::default(),
+            charts: Vec::new(),
             logs: VecDeque::with_capacity(config::SCROLLBACK_LINES),
         }
     }
 }
 
 impl State {
+    pub fn charts(&self) -> impl ExactSizeIterator<Item = &Chart> {
+        self.charts.iter().map(|(_, chart)| chart)
+    }
+
+    pub fn get_or_create_chart(&mut self, chart_id: i32) -> &mut Chart {
+        match self.charts.iter().position(|(id, _)| *id == chart_id) {
+            Some(i) => {
+                // Found existing chart
+                &mut self.charts[i].1
+            }
+            None => {
+                // Insert new chart
+                let i = self.charts.partition_point(|(id, _)| *id < chart_id);
+                self.charts.insert(i, (chart_id, Chart::default()));
+                &mut self.charts[i].1
+            }
+        }
+    }
+
     pub fn logs(&self) -> &VecDeque<String> {
         &self.logs
     }
@@ -52,6 +63,15 @@ impl State {
         };
         self.logs.push_back(string);
     }
+}
+
+#[derive(Default)]
+pub struct Chart {
+    pub chart_name: String,
+    pub series_name: String,
+    pub x_axis: Axis,
+    pub y_axis: Axis,
+    pub coords: Vec<(f64, f64)>,
 }
 
 #[derive(Default)]

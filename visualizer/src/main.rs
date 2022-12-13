@@ -22,15 +22,30 @@ mod terminal;
 
 fn main() -> Result<(), err::DebugFromDisplay<io::Error>> {
     if atty::is(atty::Stream::Stdin) {
-        eprintln!("Input must be piped into stdin.");
-        eprintln!();
-        eprintln!("All available commands:");
-        eprintln!(".vz cn <chart name>");
-        eprintln!(".vz sn <series name>");
-        eprintln!(".vz xn <x-axis name>");
-        eprintln!(".vz yn <y-axis name>");
-        eprintln!(".vz xs [<x coord>, ...]");
-        eprintln!(".vz ys [<y coord>, ...]");
+        eprintln!(
+            r"Input must be piped into stdin.
+
+All available commands:
+.vz <id> cn <chart name>
+.vz <id> sn <series name>
+.vz <id> xn <x-axis name>
+.vz <id> yn <y-axis name>
+.vz <id> xr <x-axis min> <x-axis max>
+.vz <id> yr <y-axis min> <y-axis max>
+.vz <id> xs [<x coord>, ...]
+.vz <id> ys [<y coord>, ...]
+
+Note: `xr`/`yr` will automatically fit the data.
+Note: `xs` doesn't need to be resent every time.
+
+Example sequence:
+.vz cn 0 FFT
+.vz xn 0 Frequency
+.vz yn 0 Amplitude
+.vz xs 0 [0, 10, 20, 40, 80]
+.vz ys 0 [10, 12, 20, 14, 8]
+.vz ys 0 [11, 13, 19, 14, 7]"
+        );
         return Ok(());
     }
 

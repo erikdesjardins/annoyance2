@@ -1,96 +1,133 @@
-use crate::{state::State, terminal::Redraw};
-use std::num::ParseFloatError;
+use crate::state::State;
+use crate::terminal::Redraw;
+use std::num::ParseIntError;
 
 pub fn handle_line(state: &mut State, line: &str) -> Redraw {
-    enum ParseError {
+    enum ParseError<'a> {
         NotACommand,
-        InvalidFloat(ParseFloatError),
+        MissingChartId,
+        MissingCommand,
+        InvalidCommand(&'a str),
+        MissingDelimiter(char),
+        MissingArgument,
+        InvalidInt(ParseIntError),
     }
 
-    impl From<ParseFloatError> for ParseError {
-        fn from(e: ParseFloatError) -> Self {
-            Self::InvalidFloat(e)
+    impl From<ParseIntError> for ParseError<'_> {
+        fn from(e: ParseIntError) -> Self {
+            Self::InvalidInt(e)
         }
     }
 
-    fn parse_command(state: &mut State, line: &str) -> Result<Redraw, ParseError> {
-        let example_command = ".vz xx ";
-
-        let line = line.trim_end_matches('\n');
-        let line = line.trim_end_matches('\r');
-
-        if line.len() < example_command.len() {
-            return Err(ParseError::NotACommand);
+    fn drop_eol(s: &str) -> &str {
+        if let Some(s) = s.strip_suffix("\r\n") {
+            return s;
         }
+        if let Some(s) = s.strip_suffix('\n') {
+            return s;
+        }
+        if let Some(s) = s.strip_suffix('\r') {
+            return s;
+        }
+        s
+    }
 
-        let (cmd, arguments) = line.split_at(example_command.len());
-        match cmd {
-            ".vz cn " => {
-                state.chart_name = arguments.to_string();
-                Ok(Redraw::Yes)
-            }
-            ".vz sn " => {
-                state.series_name = arguments.to_string();
-                Ok(Redraw::Yes)
-            }
-            ".vz xn " => {
-                state.x_axis.name = arguments.to_string();
-                Ok(Redraw::Yes)
-            }
-            ".vz yn " => {
-                state.y_axis.name = arguments.to_string();
-                Ok(Redraw::Yes)
-            }
-            ".vz xs " => {
+    fn parse_command<'a>(state: &mut State, line: &'a str) -> Result<Redraw, ParseError<'a>> {
+        // Drop EOL
+        let line = drop_eol(line);
+
+        // Parse prefix
+        let Some(line) = line.strip_prefix(".vz ") else { return Err(ParseError::NotACommand) };
+
+        // Parse chart id
+        let Some((chart_id, line)) = line.split_once(' ') else { return Err(ParseError::MissingChartId) };
+        let chart_id = chart_id.parse()?;
+        let mut chart = state.get_or_create_chart(chart_id);
+
+        // Parse command
+        let Some((command, args)) = line.split_once(' ') else { return Err(ParseError::MissingCommand) };
+
+        Ok(match command {
+            // Hottest commands first:
+            "xs" => {
                 // Must provide X coords first
-                state.coords.clear();
+                chart.coords.clear();
 
-                let arguments = arguments.trim_start_matches('[');
-                let arguments = arguments.trim_end_matches(']');
-                let xs = arguments.split(',');
+                let mut min_x = chart.x_axis.range.min();
+                let mut max_x = chart.x_axis.range.max();
 
-                let mut min_x = state.x_axis.range.min();
-                let mut max_x = state.x_axis.range.max();
-
-                for x in xs {
-                    let x = x.trim_start_matches(' ').parse()?;
-
+                let Some(args) = args.strip_prefix('[') else { return Err(ParseError::MissingDelimiter('[')) };
+                let Some(args) = args.strip_suffix(']') else { return Err(ParseError::MissingDelimiter(']')) };
+                for arg in args.split(", ") {
+                    let x: i32 = arg.parse()?;
+                    let x = f64::from(x);
                     min_x = min_x.min(x);
                     max_x = max_x.max(x);
-
-                    state.coords.push((x, 0.));
+                    chart.coords.push((x, 0.));
                 }
 
-                state.x_axis.range.set_min(min_x);
-                state.x_axis.range.set_max(max_x);
+                chart.x_axis.range.set_min(min_x);
+                chart.x_axis.range.set_max(max_x);
 
-                Ok(Redraw::No)
+                Redraw::No
             }
-            ".vz ys " => {
+            "ys" => {
                 // Must provide Y coords second
-                let arguments = arguments.trim_start_matches('[');
-                let arguments = arguments.trim_end_matches(']');
-                let ys = arguments.split(',');
+                let coords = chart.coords.iter_mut();
 
-                let mut min_y = state.y_axis.range.min();
-                let mut max_y = state.y_axis.range.max();
+                let mut min_y = chart.y_axis.range.min();
+                let mut max_y = chart.y_axis.range.max();
 
-                for (y, (_, old_y)) in ys.zip(state.coords.iter_mut()) {
-                    let y = y.trim_start_matches(' ').parse()?;
-
+                let Some(args) = args.strip_prefix('[') else { return Err(ParseError::MissingDelimiter('[')) };
+                let Some(args) = args.strip_suffix(']') else { return Err(ParseError::MissingDelimiter(']')) };
+                for (arg, coord) in args.split(", ").zip(coords) {
+                    let y: i32 = arg.parse()?;
+                    let y = f64::from(y);
                     min_y = min_y.min(y);
                     max_y = max_y.max(y);
-
-                    *old_y = y;
+                    coord.1 = y;
                 }
 
-                state.y_axis.range.set_min(min_y);
-                state.y_axis.range.set_max(max_y);
+                chart.y_axis.range.set_min(min_y);
+                chart.y_axis.range.set_max(max_y);
 
-                Ok(Redraw::Yes)
+                Redraw::Yes
             }
-            _ => Err(ParseError::NotACommand),
-        }
+            // Remaining (cold) alternatives:
+            "cn" => {
+                chart.chart_name = args.to_string();
+                Redraw::Yes
+            }
+            "sn" => {
+                chart.series_name = args.to_string();
+                Redraw::Yes
+            }
+            "xn" => {
+                chart.x_axis.name = args.to_string();
+                Redraw::Yes
+            }
+            "yn" => {
+                chart.y_axis.name = args.to_string();
+                Redraw::Yes
+            }
+            "xr" => {
+                let Some((min, max)) = args.split_once(' ') else { return Err(ParseError::MissingArgument) };
+                let min: i32 = min.parse()?;
+                let max: i32 = max.parse()?;
+                chart.x_axis.range.set_min(f64::from(min));
+                chart.x_axis.range.set_max(f64::from(max));
+                Redraw::Yes
+            }
+            "yr" => {
+                let Some((min, max)) = args.split_once(' ') else { return Err(ParseError::MissingArgument) };
+                let min: i32 = min.parse()?;
+                let max: i32 = max.parse()?;
+                chart.y_axis.range.set_min(f64::from(min));
+                chart.y_axis.range.set_max(f64::from(max));
+                Redraw::Yes
+            }
+            _ => return Err(ParseError::InvalidCommand(command)),
+        })
     }
 
     match parse_command(state, line) {
@@ -99,7 +136,16 @@ pub fn handle_line(state: &mut State, line: &str) -> Redraw {
             state.push_log(line);
             match e {
                 ParseError::NotACommand => {}
-                ParseError::InvalidFloat(e) => state.push_log(&format!("Error: {:?}", e)),
+                ParseError::MissingChartId => state.push_log("Error: missing chart id"),
+                ParseError::MissingCommand => state.push_log("Error: missing command"),
+                ParseError::InvalidCommand(cmd) => {
+                    state.push_log(&format!("Error: invalid command `{}`", cmd))
+                }
+                ParseError::MissingDelimiter(delim) => {
+                    state.push_log(&format!("Error: missing delimiter `{}`", delim))
+                }
+                ParseError::MissingArgument => state.push_log("Error: missing argument"),
+                ParseError::InvalidInt(e) => state.push_log(&format!("Error: {:?}", e)),
             }
             Redraw::Yes
         }
