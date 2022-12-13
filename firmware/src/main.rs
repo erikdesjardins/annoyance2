@@ -122,9 +122,12 @@ mod app {
 
     #[init]
     fn init(mut cx: init::Context) -> (Shared, Local, init::Monotonics) {
-        defmt::info!("Dumping config...");
+        defmt::info!("Dumping config and log preludes...");
 
         config::dump_to_log();
+
+        adc::log_last_few_samples_prelude();
+        fft::log_amplitudes_prelude();
 
         defmt::info!("Starting init...");
 

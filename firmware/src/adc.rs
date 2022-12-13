@@ -36,13 +36,24 @@ pub fn process_raw_samples(
     }
 }
 
+pub fn log_last_few_samples_prelude() {
+    if config::debug::LOG_LAST_FEW_SAMPLES {
+        defmt::println!(".vz 0 cn Samples");
+        defmt::println!(".vz 0 yn Amplitude");
+        let half = i32::from(config::adc::MAX_POSSIBLE_SAMPLE / 2);
+        defmt::println!(".vz 0 yr {} {}", -half, half);
+        let mut positions = [0u16; config::debug::LOG_LAST_N_SAMPLES];
+        for (i, pos) in positions.iter_mut().enumerate() {
+            *pos = i.truncate();
+        }
+        defmt::println!(".vz 0 xs {}", positions);
+    }
+}
+
 pub fn log_last_few_samples(samples: &[i16; config::adc::BUF_LEN_PROCESSED]) {
     if config::debug::LOG_LAST_FEW_SAMPLES {
-        defmt::println!(
-            "ADC samples (last {}): {}",
-            config::debug::LOG_LAST_N_SAMPLES,
-            samples[samples.len() - config::debug::LOG_LAST_N_SAMPLES..]
-        );
+        let amplitudes = &samples[samples.len() - config::debug::LOG_LAST_N_SAMPLES..];
+        defmt::println!(".vz 0 ys {}", amplitudes);
     }
 }
 
