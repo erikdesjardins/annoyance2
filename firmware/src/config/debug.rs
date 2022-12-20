@@ -14,10 +14,11 @@ pub const LOG_TIMING: bool = false;
 pub const LOG_CONTROL_VALUES: bool = false;
 
 pub const LOG_LAST_FEW_SAMPLES: bool = false;
-pub const LOG_LAST_N_SAMPLES: usize = 100;
-
-pub const LOG_FFT_PEAKS: bool = false;
+pub const LOG_LAST_N_SAMPLES: usize = 512;
 
 pub const LOG_ALL_FFT_AMPLITUDES: bool = false;
+pub const LOG_FFT_SCRATCH_PEAKS: bool = false;
+
+pub const LOG_FFT_PEAKS: bool = false;
 
 pub const LOG_ALL_PULSES: bool = false;

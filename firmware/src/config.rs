@@ -9,8 +9,9 @@ pub fn dump_to_log() {
         - LOG_CONTROL_VALUES: {}\n\
         - LOG_LAST_FEW_SAMPLES: {}\n\
         - LOG_LAST_N_SAMPLES:   {}\n\
-        - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_FFT_AMPLITUDES: {}\n\
+        - LOG_FFT_SCRATCH_PEAKS: {}\n\
+        - LOG_FFT_PEAKS: {}\n\
         - LOG_ALL_PULSES: {}\n\
         Clocks:\n\
         - HSE_FREQ: {} Hz\n\
@@ -29,13 +30,17 @@ pub fn dump_to_log() {
         - BUF_LEN_PROCESSED: {}\n\
         FFT:\n\
         - WINDOW: {}\n\
-        - BUF_LEN_REAL:    {}\n\
-        - BUF_LEN_COMPLEX: {}\n\
-        - FREQ_RESOLUTION: {}.{} Hz (max {}.{} Hz)\n\
-        - MAX_FEASIBLE_AMPLITUDE: {}\n\
+        - BUF_LEN_REAL:         {}\n\
+        - BUF_LEN_COMPLEX:      {}\n\
+        - BUF_LEN_COMPLEX_REAL: {}\n\
+        - FREQ_RESOLUTION: {}.{} Hz\n\
+        - EQUALIZATION: {}\n\
+        - MAX_FREQ: {} Hz\n\
+        - MAX_AMPLITUDE: {}\n\
         FFT analysis:\n\
+        - MAX_SCRATCH_PEAKS: {}\n\
         - MAX_PEAKS: {}\n\
-        - AMPLITUDE_THRESHOLD_RANGE: {} .. {}\n\
+        - NOISE_FLOOR_AMPLITUDE: {}\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
@@ -50,8 +55,9 @@ pub fn dump_to_log() {
         debug::LOG_CONTROL_VALUES,
         debug::LOG_LAST_FEW_SAMPLES,
         debug::LOG_LAST_N_SAMPLES,
-        debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_FFT_AMPLITUDES,
+        debug::LOG_FFT_SCRATCH_PEAKS,
+        debug::LOG_FFT_PEAKS,
         debug::LOG_ALL_PULSES,
         clk::HSE_FREQ.to_Hz(),
         clk::SYSCLK.to_Hz(),
@@ -71,14 +77,15 @@ pub fn dump_to_log() {
         fft::WINDOW,
         fft::BUF_LEN_REAL,
         fft::BUF_LEN_COMPLEX,
+        fft::BUF_LEN_COMPLEX_REAL,
         fft::FREQ_RESOLUTION_X1000 / 1000,
         fft::FREQ_RESOLUTION_X1000 % 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 / 1000,
-        fft::FREQ_RESOLUTION_X1000 * fft::BUF_LEN_COMPLEX / 2 % 1000,
-        fft::MAX_FEASIBLE_AMPLITUDE,
+        fft::EQUALIZATION,
+        fft::MAX_FREQ,
+        fft::MAX_AMPLITUDE,
+        fft::analysis::MAX_SCRATCH_PEAKS,
         fft::analysis::MAX_PEAKS,
-        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.start,
-        fft::analysis::AMPLITUDE_THRESHOLD_RANGE.end,
+        fft::analysis::NOISE_FLOOR_AMPLITUDE,
         indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION_RANGE.start.to_nanos() / 1000,
         pulse::DURATION_RANGE.start.to_nanos() % 1000,
@@ -113,16 +120,16 @@ pub mod clk {
     /// Use external oscillator (required to get max 72MHz sysclk)
     pub const HSE_FREQ: Hertz<u32> = Hertz::<u32>::MHz(8);
 
-    /// PLLMUL @ x3 (max 72MHz)
-    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(24);
+    /// PLLMUL @ x6 (max 72MHz)
+    pub const SYSCLK: Hertz<u32> = Hertz::<u32>::MHz(48);
     pub const SYSCLK_HZ: u32 = SYSCLK.to_Hz();
 
     // For timer outputs, only need >= 1MHz since minimum pulse duration is 1us
 
     /// APB1 prescaler @ /16 (max 36MHz)
-    pub const PCLK1: Hertz<u32> = Hertz::<u32>::kHz(1500);
-    /// APB2 prescaler @ /4 (max 72MHz)
-    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(6);
+    pub const PCLK1: Hertz<u32> = Hertz::<u32>::MHz(3);
+    /// APB2 prescaler @ /16 (max 72MHz)
+    pub const PCLK2: Hertz<u32> = Hertz::<u32>::MHz(3);
 
     /// TIM1 prescaler @ /1
     pub const TIM1CLK: Hertz<u32> = {
@@ -141,7 +148,7 @@ pub mod clk {
     pub const TIM1CLK_HZ: u32 = TIM1CLK.to_Hz();
 
     /// ADC prescaler @ /2 (max 14MHz, min 600kHz)
-    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(3000);
+    pub const ADCCLK: Hertz<u32> = Hertz::<u32>::kHz(1500);
 }
 
 // Prolog for clock config:
@@ -170,16 +177,17 @@ pub mod adc {
     use stm32f1xx_hal::adc::SampleTime;
 
     /// The resolution of the hardware ADC being used.
-    pub const RESOLUTION_BITS: u16 = 12;
+    pub const RESOLUTION_BITS: u32 = 12;
 
     /// The maximum possible sample value from the hardware ADC.
-    pub const MAX_POSSIBLE_SAMPLE: u16 = (1 << RESOLUTION_BITS) - 1;
+    #[allow(clippy::cast_possible_truncation)]
+    pub const MAX_POSSIBLE_SAMPLE: u16 = (1 << RESOLUTION_BITS as u16) - 1;
 
     /// ADC averages x samples for each data point
     pub const OVERSAMPLE: usize = 2;
 
     /// Sample at ADCCLK / this
-    const SAMPLE_CYC_X10_UNADJUSTED: usize = 415;
+    const SAMPLE_CYC_X10_UNADJUSTED: usize = 285;
     pub const SAMPLE: SampleTime = match SAMPLE_CYC_X10_UNADJUSTED {
         15 => SampleTime::T_1,
         75 => SampleTime::T_7,
@@ -229,7 +237,7 @@ pub mod adc {
 pub mod fft {
     use crate::config;
     use crate::fft;
-    use crate::math::const_scale_by_u16_u16;
+    use crate::math::{const_scale_by_u16_u16, ScalingFactor};
     use defmt::Format;
 
     /// Possible window functions to apply to sampled data before running the FFT.
@@ -275,37 +283,57 @@ pub mod fft {
     /// Complex ADC buffer is half the size, since each `Complex<i16>` holds two samples
     pub const BUF_LEN_COMPLEX: usize = BUF_LEN_REAL / 2;
 
+    /// The part of the complex ADC buffer holding real frequencies is half the size,
+    /// since imaginary frequencies occupy the other half.
+    pub const BUF_LEN_COMPLEX_REAL: usize = BUF_LEN_COMPLEX / 2;
+
     /// Each FFT bin is this many Hz apart
     pub const FREQ_RESOLUTION_X1000: usize =
         10 * config::adc::SAMPLES_PER_SEC_PROCESSED_X100 / BUF_LEN_REAL;
 
+    /// Whether to amplify high frequencies to offset the FFT's non-flat frequency response
+    pub const EQUALIZATION: bool = true;
+
+    /// Frequency of the maximum FFT bin
+    #[allow(clippy::cast_possible_truncation)]
+    pub const MAX_FREQ: u16 = (FREQ_RESOLUTION_X1000 * BUF_LEN_COMPLEX_REAL / 1000) as u16;
+
     /// Maximum feasible amplitude of an FFT peak.
-    pub const MAX_FEASIBLE_AMPLITUDE: u16 = {
-        let amplitude = config::adc::MAX_POSSIBLE_SAMPLE;
+    pub const MAX_AMPLITUDE: u16 = {
+        // samples are scaled up to full i16 range, allowing a potential amplitude of all 16 bits
+        let amplitude = u16::MAX;
         // amplitude is scaled down by zeroed padding added to samples
         #[allow(clippy::cast_possible_truncation)]
         let zeroed_padding_factor =
-            (u16::MAX as u32 * config::adc::BUF_LEN_PROCESSED as u32 / BUF_LEN_REAL as u32) as u16;
+            ScalingFactor::from_ratio(config::adc::BUF_LEN_PROCESSED as u16, BUF_LEN_REAL as u16);
         let amplitude = const_scale_by_u16_u16(amplitude, zeroed_padding_factor);
         // amplitude is scaled down by window function
         let window_factor = fft::window::amplitude_scale_factor();
         let amplitude = const_scale_by_u16_u16(amplitude, window_factor);
         // for some unexplainable reason, the actual achievable amplitude is a factor of slightly less than 3 off...
         // use a factor of approximately 2*sqrt(2) to provide some safety margin
-        let fudge_factor_x_10 = 28;
-        let amplitude = amplitude * 10 / fudge_factor_x_10;
+        let fudge_factor = ScalingFactor::from_ratio(1000, 2828);
+        let amplitude = const_scale_by_u16_u16(amplitude, fudge_factor);
         amplitude
     };
 
     pub mod analysis {
         use crate::config;
-        use core::ops::Range;
 
-        /// Maximum number of peaks to find in the FFT spectrum
+        /// Maximum number of possible "scratch peaks" that could occur in the raw FFT spectrum.
+        pub const MAX_SCRATCH_PEAKS: usize = {
+            // Worst case is a zigzag that starts or ends with a peak, e.g. for 3 or 4 buckets
+            // . .
+            //  . .
+            (config::fft::BUF_LEN_COMPLEX_REAL + 1) / 2
+        };
+
+        /// Maximum number of above-threshold peaks to find in the FFT spectrum.
         pub const MAX_PEAKS: usize = 8;
 
-        /// Amplitude for a FFT bin to be considered a peak when control is set to minimum/maximum
-        pub const AMPLITUDE_THRESHOLD_RANGE: Range<u16> = 20..config::fft::MAX_FEASIBLE_AMPLITUDE;
+        /// Min amplitude for a FFT bin to be considered a peak.
+        /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
+        pub const NOISE_FLOOR_AMPLITUDE: u16 = 100;
     }
 }
 
@@ -331,5 +359,5 @@ pub mod pulse {
     /// causing us to miss the deadline (and wait until the timer wraps).
     ///
     /// It also provides a minimum repeat rate, for the same reason.
-    pub const SCHEDULING_OFFSET: Duration = Duration::micros(10);
+    pub const SCHEDULING_OFFSET: Duration = Duration::micros(50);
 }

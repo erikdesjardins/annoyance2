@@ -9,5 +9,13 @@ rustflags = [
   "-C", "link-arg=--nmagic",
 ]
 
-[build]
-target = "thumbv7m-none-eabi"    # Cortex-M3
+# Ideally we could use this to avoid having to specify the target, but there are two things in conflict here:
+# 1. `.cargo/config.toml` is read from the CWD, not the manifest dir.
+# 2. We want to be able to run something like `cargo run firmware | cargo run visualizer` from the top level for visualization.
+# Because of the former, we can't put this config file in the `firmware` directory, so it only applies to that project.
+# Because of the latter, we need to be able to target both the device and the host from the same CWD.
+# And since the host platform may vary, it doesn't make sense to set this target here and just override it with `--target host`,
+# because then you'd have to use different build commands for Windows and Linux hosts, which is a bit annoying to document.
+
+# [build]
+# target = "thumbv7m-none-eabi"    # Cortex-M3

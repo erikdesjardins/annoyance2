@@ -1,4 +1,5 @@
 use crate::panic::OptionalExt;
+use defmt::Format;
 use fixed::types::{I16F48, U32F0};
 use fixed_sqrt::FixedSqrt;
 use num_complex::Complex;
@@ -31,8 +32,8 @@ pub fn amplitude_sqrt(x: u32) -> u16 {
 
 /// Phase of a complex number.
 ///
-/// Returns a scale factor (representing 0..2pi), ready to pass to `scale_by`.
-pub fn phase(x: Complex<i16>) -> u16 {
+/// Return value represents 0..2pi.
+pub fn phase(x: Complex<i16>) -> ScalingFactor<u16> {
     let y = I16F48::from_num(x.im);
     let x = I16F48::from_num(x.re);
     let angle = cordic::atan2(y, x);
@@ -43,32 +44,88 @@ pub fn phase(x: Complex<i16>) -> u16 {
         angle + (2 * I16F48::PI)
     };
     // convert from 0..2pi to 0..1
-    let angle = angle / I16F48::PI / 2;
+    let factor = angle / I16F48::PI / 2;
     // extract 16 most significant bits of fraction
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     // deliberate truncation (shouldn't happen, but if it does, 0 cycles = 1 cycle [in phase], so it doesn't matter)
-    let angle = (angle.to_bits() >> (48 - 16)) as u16;
-    angle
+    let factor = (factor.to_bits() >> (48 - 16)) as u16;
+    ScalingFactor::from_raw(factor)
+}
+
+/// A scaling factor, from zero to one.
+///
+/// Internally, zero is represented as `0`, and 1 is represented as `T::MAX`.
+#[derive(Copy, Clone, Format)]
+pub struct ScalingFactor<T>(T);
+
+impl ScalingFactor<u16> {
+    pub const ONE: Self = Self(u16::MAX);
+
+    /// Construct a scaling factor from a raw value, with `MAX` representing one.
+    pub const fn from_raw(factor: u16) -> Self {
+        Self(factor)
+    }
+
+    /// Construct a scaling factor from a sample with limited bits.
+    #[track_caller]
+    pub const fn from_sample<const BITS: u32>(sample: u16) -> Self {
+        assert!(BITS <= u16::BITS);
+        debug_assert!((sample as u32) < (1 << BITS));
+        let factor = sample << (u16::BITS - BITS);
+        Self(factor)
+    }
+
+    /// Construct a scaling factor from a proper fraction.
+    #[track_caller]
+    pub const fn from_ratio(num: u16, denom: u16) -> Self {
+        assert!(num <= denom);
+        let factor = u16::MAX as u32 * num as u32 / denom as u32;
+        #[allow(clippy::cast_possible_truncation)]
+        let factor = factor as u16;
+        Self(factor)
+    }
+
+    /// Split factor up into N buckets.
+    ///
+    /// For example, an overall scale factor of 62.5% (5/8) would be distributed over 4 buckets to: 100% 100% 50% 0%.
+    pub fn distribute<const N: usize>(self) -> [Self; N] {
+        let mut factors = [Self(0); N];
+
+        for (i, factor) in factors.iter_mut().enumerate() {
+            let overall_factor = self.0;
+            let max_factor_over_n: u16 = u16::MAX / N.truncate();
+            let local_factor_over_n: u16 =
+                overall_factor.saturating_sub(i.truncate() * max_factor_over_n);
+            let local_factor: u16 = if local_factor_over_n >= max_factor_over_n {
+                u16::MAX
+            } else {
+                local_factor_over_n * N.truncate()
+            };
+            *factor = Self(local_factor);
+        }
+
+        factors
+    }
 }
 
 /// Fixed point scaling.
 ///
 /// The `factor` argument represents scaling from 0 (at `0`) to 1 (at `T::MAX`).
 pub trait ScaleBy<Factor> {
-    fn scale_by(self, by: Factor) -> Self;
+    fn scale_by(self, by: ScalingFactor<Factor>) -> Self;
 }
 
 macro_rules! impl_scaleby {
     ($this:ty, by: $factor:ty, via: $intermediate:ty, $const_shim:ident) => {
         impl ScaleBy<$factor> for $this {
-            fn scale_by(self, by: $factor) -> Self {
-                ((self as $intermediate * by as $intermediate) >> <$factor>::BITS) as $this
+            fn scale_by(self, by: ScalingFactor<$factor>) -> Self {
+                ((self as $intermediate * by.0 as $intermediate) >> <$factor>::BITS) as $this
             }
         }
 
         #[allow(dead_code)]
-        pub const fn $const_shim(this: $this, by: $factor) -> $this {
-            ((this as $intermediate * by as $intermediate) >> <$factor>::BITS) as $this
+        pub const fn $const_shim(this: $this, by: ScalingFactor<$factor>) -> $this {
+            ((this as $intermediate * by.0 as $intermediate) >> <$factor>::BITS) as $this
         }
     };
 }
@@ -88,8 +145,14 @@ macro_rules! impl_truncate {
         const _: () = assert!(<$to>::BITS <= <$from>::BITS);
 
         impl Truncate<$to> for $from {
+            #[track_caller]
             fn truncate(self) -> $to {
-                debug_assert!(self <= <$to>::MAX as $from);
+                debug_assert!(
+                    self <= <$to>::MAX as $from,
+                    "expected {} <= {}",
+                    self,
+                    <$to>::MAX
+                );
                 #[allow(clippy::cast_possible_truncation)]
                 let truncated = self as $to;
                 truncated

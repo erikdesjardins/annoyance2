@@ -1,11 +1,8 @@
 [package]
 authors = ["Erik Desjardins <erikdesjardins@users.noreply.github.com>"]
-name = "annoyance2"
+name = "firmware"
 edition = "2021"
 version = "1.0.0"
-
-[workspace]
-members = ["testsuite"]
 
 [dependencies]
 cordic = "0.1"
@@ -27,24 +24,24 @@ stm32f1xx-hal = { version = "0.9", features = ["stm32f103", "medium", "rtic"] }
 codegen-units = 1
 debug = 2
 incremental = false
-opt-level = "s"
+opt-level = 2
 
 [profile.test]
 codegen-units = 1
 debug = 2
 incremental = false
-opt-level = "s"
+opt-level = 2
 
 [profile.release]
 codegen-units = 1
 debug = 2
 incremental = false
 lto = 'fat'
-opt-level = "s"
+opt-level = 3
 
 [profile.bench]
 codegen-units = 1
 debug = 2
 incremental = false
 lto = 'fat'
-opt-level = "s"
+opt-level = 3

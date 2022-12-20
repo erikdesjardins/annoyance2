@@ -1,10 +1,11 @@
 use crate::config;
-use crate::math::{amplitude_sqrt, amplitude_squared};
+use crate::math::{amplitude_sqrt, amplitude_squared, Truncate};
 use crate::panic::OptionalExt;
 use core::mem;
 use num_complex::Complex;
 
 pub mod analysis;
+pub mod equalizer;
 mod imp;
 pub mod window;
 
@@ -15,31 +16,39 @@ pub mod window;
 /// - index N/2 to N: negative frequencies (generally can be ignored)
 pub fn run(
     samples: &mut [i16; config::fft::BUF_LEN_REAL],
-) -> &[Complex<i16>; config::fft::BUF_LEN_COMPLEX / 2] {
+) -> &mut [Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL] {
     let bins = complex_from_adjacent_values(samples);
 
     imp::radix2(bins);
 
     // ignore bins N/2 to N (negative frequencies)
-    let bins: &[_; config::fft::BUF_LEN_COMPLEX / 2] = bins[..config::fft::BUF_LEN_COMPLEX / 2]
-        .try_into()
-        .unwrap_infallible();
+    let (bins, _) = bins.split_at_mut(config::fft::BUF_LEN_COMPLEX_REAL);
+    let bins: &mut [_; config::fft::BUF_LEN_COMPLEX_REAL] = bins.try_into().unwrap_infallible();
 
+    bins
+}
+
+pub fn log_amplitudes_prelude() {
     if config::debug::LOG_ALL_FFT_AMPLITUDES {
-        let mut amplitudes = [0; config::fft::BUF_LEN_COMPLEX / 2];
+        defmt::println!(".vz 1 cn FFT");
+        defmt::println!(".vz 1 xn Frequency (Hz)");
+        defmt::println!(".vz 1 yn Amplitude");
+        let mut freqs = [0u16; config::fft::BUF_LEN_COMPLEX_REAL];
+        for (i, freq) in freqs.iter_mut().enumerate() {
+            *freq = (config::fft::FREQ_RESOLUTION_X1000 * i / 1000).truncate();
+        }
+        defmt::println!(".vz 1 xs {}", freqs);
+    }
+}
+
+pub fn log_amplitudes(bins: &[Complex<i16>; config::fft::BUF_LEN_COMPLEX_REAL]) {
+    if config::debug::LOG_ALL_FFT_AMPLITUDES {
+        let mut amplitudes = [0u16; config::fft::BUF_LEN_COMPLEX_REAL];
         for (amp, bin) in amplitudes.iter_mut().zip(bins) {
             *amp = amplitude_sqrt(amplitude_squared(*bin));
         }
-        defmt::println!(
-            "FFT ({}.{} Hz per each of {} buckets): {}",
-            config::fft::FREQ_RESOLUTION_X1000 / 1000,
-            config::fft::FREQ_RESOLUTION_X1000 % 1000,
-            amplitudes.len(),
-            amplitudes
-        );
+        defmt::println!(".vz 1 ys {}", amplitudes);
     }
-
-    bins
 }
 
 fn complex_from_adjacent_values<T>(

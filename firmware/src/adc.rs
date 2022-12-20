@@ -1,5 +1,5 @@
 use crate::config;
-use crate::math::{const_scale_by_i16_u16, DivRound, Truncate};
+use crate::math::{const_scale_by_i16_u16, DivRound, ScalingFactor, Truncate};
 use crate::panic::OptionalExt;
 
 #[inline(never)]
@@ -25,7 +25,8 @@ pub fn process_raw_samples(
             .unwrap_infallible();
         let offset: i32 = max_possible_sample / 2;
         let sample: i32 = sample - offset;
-        // truncate sum, which should fit into i16 because ADC only has 12 bits of resolution
+        // truncate sum, which should fit into i16 because ADC has < 16 bits of (unsigned) resolution
+        assert!(config::adc::RESOLUTION_BITS < i16::BITS);
         let sample: i16 = sample.truncate();
         *value = sample;
     }
@@ -33,13 +34,26 @@ pub fn process_raw_samples(
     if config::debug::FAKE_INPUT_DATA {
         output.copy_from_slice(&FAKE_COS_TABLE);
     }
+}
 
+pub fn log_last_few_samples_prelude() {
     if config::debug::LOG_LAST_FEW_SAMPLES {
-        defmt::println!(
-            "ADC samples (last {}): {}",
-            config::debug::LOG_LAST_N_SAMPLES,
-            output[output.len() - config::debug::LOG_LAST_N_SAMPLES..]
-        );
+        defmt::println!(".vz 0 cn Samples");
+        defmt::println!(".vz 0 yn Amplitude");
+        let half = i32::from(config::adc::MAX_POSSIBLE_SAMPLE / 2);
+        defmt::println!(".vz 0 yr {} {}", -half, half);
+        let mut positions = [0u16; config::debug::LOG_LAST_N_SAMPLES];
+        for (i, pos) in positions.iter_mut().enumerate() {
+            *pos = i.truncate();
+        }
+        defmt::println!(".vz 0 xs {}", positions);
+    }
+}
+
+pub fn log_last_few_samples(samples: &[i16; config::adc::BUF_LEN_PROCESSED]) {
+    if config::debug::LOG_LAST_FEW_SAMPLES {
+        let amplitudes = &samples[samples.len() - config::debug::LOG_LAST_N_SAMPLES..];
+        defmt::println!(".vz 0 ys {}", amplitudes);
     }
 }
 
@@ -55,7 +69,10 @@ static FAKE_COS_TABLE: [i16; config::adc::BUF_LEN_PROCESSED] = {
         let frequency = i * config::debug::FAKE_INPUT_CYCLES_PER_BUF;
         let phase = config::debug::FAKE_INPUT_PHASE * LEN / u16::MAX as usize;
         let unscaled_sample = COS_TABLE[(frequency + phase) % LEN];
-        fake[i] = const_scale_by_i16_u16(unscaled_sample, config::debug::FAKE_INPUT_AMPLITUDE);
+        // since we know the samples are already in a 0..u16::MAX range,
+        // we can use the desired amplitude directly as a scaling factor
+        let factor = ScalingFactor::from_raw(config::debug::FAKE_INPUT_AMPLITUDE);
+        fake[i] = const_scale_by_i16_u16(unscaled_sample, factor);
         i += 1;
     }
 
