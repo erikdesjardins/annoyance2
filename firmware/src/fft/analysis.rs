@@ -134,7 +134,7 @@ pub fn find_peaks(
                 None => 0,
             };
             let mut max_amplitude_squared = match max_peak.i() {
-                Some(i) => amplitude_squared(bins[i as usize]),
+                Some(i) => amplitude_squared(bins[i]),
                 // if the first peak has been consumed, set its amplitude to 0 to ensure it'll be overwritten or culled
                 None => 0,
             };
