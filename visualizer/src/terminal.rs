@@ -44,7 +44,7 @@ fn draw_charts(state: &State, f: &mut Frame<impl Backend>, area: Rect) {
     for (chart, area) in charts.zip(chunks) {
         let dataset = Dataset::default()
             .name(&chart.series_name)
-            .marker(Marker::Dot)
+            .marker(Marker::Braille)
             .style(Style::default().fg(Color::Cyan))
             .data(&chart.coords);
 
