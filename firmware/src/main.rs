@@ -59,7 +59,6 @@ mod app {
     use crate::pulse::{Pulses, UnadjustedPulses};
     use crate::time::{Duration, Instant, PulseDuration};
     use crate::{adc, control};
-    use core::sync::atomic::{AtomicU32, Ordering};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
     use heapless::Vec;
@@ -73,12 +72,12 @@ mod app {
         Ch, Channel::*, PwmHz, Tim1NoRemap, Tim3NoRemap, Tim4NoRemap, Timer,
     };
 
-    static PULSE_WIDTH_TICKS: AtomicU32 = AtomicU32::new(0);
-
     #[shared]
     struct Shared {
         pulses: &'static mut Pulses,
         scheduled_pulse: Option<fire_pulse::SpawnHandle>,
+        pulse_timer:
+            OnePulse<TIM1, Tim1NoRemap, Ch<0>, pins::A8_TIM1C1_PULSE, { config::clk::TIM1CLK_HZ }>,
     }
 
     #[local]
@@ -115,8 +114,6 @@ mod app {
                 pins::B9_TIM4C4,
             ),
         >,
-        pulse_timer:
-            OnePulse<TIM1, Tim1NoRemap, Ch<0>, pins::A8_TIM1C1_PULSE, { config::clk::TIM1CLK_HZ }>,
         debug_led: pins::C13_DEBUG_LED,
     }
 
@@ -261,6 +258,7 @@ mod app {
             Shared {
                 pulses,
                 scheduled_pulse: None,
+                pulse_timer,
             },
             Local {
                 adc1_dma_transfer,
@@ -272,7 +270,6 @@ mod app {
                 pulse_width_control_pin,
                 amplitude_timer,
                 threshold_timer,
-                pulse_timer,
                 debug_led: led,
             },
             init::Monotonics(mono),
@@ -302,44 +299,44 @@ mod app {
         shared = [
             pulses,
             scheduled_pulse,
+            pulse_timer,
         ],
         local = [
-            pulse_timer,
         ],
         priority = 16,
     )]
     fn fire_pulse(cx: fire_pulse::Context, now: Instant) {
-        (cx.shared.pulses, cx.shared.scheduled_pulse).lock(|pulses, scheduled_pulse| {
-            // load pulse width
-            let pulse_width = PulseDuration::from_ticks(PULSE_WIDTH_TICKS.load(Ordering::Relaxed));
+        (
+            cx.shared.pulses,
+            cx.shared.scheduled_pulse,
+            cx.shared.pulse_timer,
+        )
+            .lock(|pulses, scheduled_pulse, pulse_timer| {
+                // fire timer
+                pulse_timer.fire();
 
-            // fire timer
-            cx.local.pulse_timer.fire(pulse_width);
-
-            // log
-            if config::debug::LOG_ALL_PULSES {
-                defmt::println!(
-                    "Firing {}.{} us pulse at {} us",
-                    pulse_width.to_nanos() / 1000,
-                    pulse_width.to_nanos() % 1000,
-                    Duration::from_ticks(now.ticks()).to_micros()
-                );
-            }
-
-            // consume this pulse (rescheduling this frequency)
-            if let Err(()) = pulses.try_consume_pulse(now) {
-                defmt::warn!("Pulse was not present in pulse train");
-                return;
-            }
-
-            // reschedule ourselves for the next pulse
-            if let Some(next_pulse) = pulses.next_pulse(now) {
-                match fire_pulse::spawn_at(next_pulse, next_pulse) {
-                    Ok(handle) => *scheduled_pulse = Some(handle),
-                    Err(_) => defmt::warn!("Internal fire_pulse schedule overrun"),
+                // log
+                if config::debug::LOG_ALL_PULSES {
+                    defmt::println!(
+                        "Firing pulse at {} us",
+                        Duration::from_ticks(now.ticks()).to_micros()
+                    );
                 }
-            }
-        });
+
+                // consume this pulse (rescheduling this frequency)
+                if let Err(()) = pulses.try_consume_pulse(now) {
+                    defmt::warn!("Pulse was not present in pulse train");
+                    return;
+                }
+
+                // reschedule ourselves for the next pulse
+                if let Some(next_pulse) = pulses.next_pulse(now) {
+                    match fire_pulse::spawn_at(next_pulse, next_pulse) {
+                        Ok(handle) => *scheduled_pulse = Some(handle),
+                        Err(_) => defmt::warn!("Internal fire_pulse schedule overrun"),
+                    }
+                }
+            });
     }
 
     /// This task schedules pulse timings, from the previous buffer,
@@ -357,6 +354,7 @@ mod app {
         shared = [
             pulses,
             scheduled_pulse,
+            pulse_timer,
         ],
         local = [
             adc1_dma_transfer,
@@ -372,7 +370,7 @@ mod app {
         ],
         priority = 14,
     )]
-    fn swap_buffers(cx: swap_buffers::Context) {
+    fn swap_buffers(mut cx: swap_buffers::Context) {
         cx.local.debug_led.set_low();
 
         // getting the timestamp must happen a consistent delay after the start of the task,
@@ -449,7 +447,9 @@ mod app {
         log_timing("Finished reading from controls");
 
         // Step 2: store pulse width
-        PULSE_WIDTH_TICKS.store(pulse_width.ticks(), Ordering::Relaxed);
+        cx.shared.pulse_timer.lock(|pulse_timer| {
+            pulse_timer.set_pulse_time(pulse_width);
+        });
 
         log_timing("Finished storing pulse width");
 

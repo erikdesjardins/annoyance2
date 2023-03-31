@@ -126,7 +126,7 @@ where
     REMAP: Remap<Periph = TIM1>,
     PINS: Pins<REMAP, P>,
 {
-    pub fn fire(&mut self, pulse_time: Duration<u32, 1, FREQ>) {
+    pub fn set_pulse_time(&mut self, pulse_time: Duration<u32, 1, FREQ>) {
         // time is ARR - CCR + 1, so subtract 1 tick
         // (note that CCR is effectively 0 here due to fast enable)
         self.timer.tim.arr.write(|w| {
@@ -136,7 +136,9 @@ where
                 ticks.try_into().unwrap()
             })
         });
+    }
 
+    pub fn fire(&mut self) {
         // enable one pulse mode and start the timer
         self.timer
             .tim
