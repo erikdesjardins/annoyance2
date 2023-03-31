@@ -41,7 +41,7 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
         let inverse_stage = N_LOG2 - 1 - STAGE;
         let stride = 1 << STAGE;
         let step = stride << 1;
-        for m in 0..stride {
+        (0..stride).for_each(|m| {
             // compute twiddle factors
             let iw = m << inverse_stage;
             let wr = i32::from(SIN_TABLE[iw + N / 4] >> SCALE);
@@ -67,7 +67,7 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
                 f[i].re = qr + tr;
                 f[i].im = qi + ti;
             });
-        }
+        });
     }
 
     run_stage::<0>(f);
