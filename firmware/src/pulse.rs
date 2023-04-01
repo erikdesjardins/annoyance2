@@ -20,7 +20,7 @@ pub fn schedule_pulses(
         let phase_offset = peak.phase_offset();
         Pulse {
             period,
-            next: phase_offset + period,
+            next: phase_offset,
         }
     });
 }
