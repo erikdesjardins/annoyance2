@@ -74,30 +74,39 @@ impl Pulses {
     /// Get the timestamp of the next pulse, if any are scheduled.
     pub fn next_pulse(&mut self, after: Instant) -> Option<Instant> {
         loop {
-            let (offset, next_pulse) = self
-                .pulses
-                .iter()
-                .map(|pulse| {
-                    let after_ticks = after.ticks();
-                    let pulse_ticks = pulse.next.ticks();
-                    // handle tick count wrapping, e.g.
-                    //
-                    // |-*---*----*-------------*---|
-                    //   ^   ^    ^      ^      ^
-                    //   2   3    4    after    1
-                    let offset = Duration::from_ticks(pulse_ticks.wrapping_sub(after_ticks));
-                    (offset, pulse.next)
-                })
-                .min_by_key(|(offset, _)| *offset)?;
+            let mut dummy_pulse = Pulse {
+                period: Duration::from_ticks(0),
+                next: Instant::from_ticks(0),
+            };
+            let mut min_offset = Duration::from_ticks(u32::MAX);
+            let mut next_pulse = &mut dummy_pulse;
 
-            if offset < config::pulse::SCHEDULING_OFFSET {
-                // too short interval--discard this pulse and retry
-                self.try_consume_pulse(next_pulse)
-                    .unwrap_or_else(|_| panic!("can't find pulse that exists (impossible)"));
+            for pulse in &mut self.pulses {
+                let after_ticks = after.ticks();
+                let pulse_ticks = pulse.next.ticks();
+                // handle tick count wrapping, e.g.
+                //
+                // |-*---*----*-------------*---|
+                //   ^   ^    ^      ^      ^
+                //   2   3    4    after    1
+                let offset = Duration::from_ticks(pulse_ticks.wrapping_sub(after_ticks));
+                if offset < min_offset {
+                    min_offset = offset;
+                    next_pulse = pulse;
+                }
+            }
+
+            if min_offset < config::pulse::SCHEDULING_OFFSET {
+                // too short interval--reschedule this pulse and retry
+                next_pulse.next += next_pulse.period;
                 continue;
             }
 
-            break Some(next_pulse);
+            if next_pulse.period == Duration::from_ticks(0) {
+                break None;
+            } else {
+                break Some(next_pulse.next);
+            };
         }
     }
 }
