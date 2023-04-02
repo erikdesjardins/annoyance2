@@ -57,7 +57,7 @@ mod app {
     use crate::panic::OptionalExt;
     use crate::pulse;
     use crate::pulse::{Pulses, UnadjustedPulses};
-    use crate::time::{Duration, Instant, PulseDuration};
+    use crate::time::{Duration, Instant};
     use crate::{adc, control};
     use cortex_m::singleton;
     use dwt_systick_monotonic::DwtSystick;
@@ -437,11 +437,7 @@ mod app {
                 .adc2_controls
                 .read(cx.local.pulse_width_control_pin)
                 .unwrap_infallible();
-            control::Sample::new(sample).to_value_in_range_via(
-                config::pulse::DURATION_RANGE,
-                |d| d.ticks(),
-                PulseDuration::from_ticks,
-            )
+            control::Sample::new(sample).to_value_in_range(config::pulse::DURATION_RANGE)
         };
 
         log_timing("Finished reading from controls");
