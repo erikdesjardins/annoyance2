@@ -244,7 +244,7 @@ mod app {
             singleton!(: Vec<ScratchPeak, { config::fft::analysis::MAX_SCRATCH_PEAKS }> = Vec::new())
                 .unwrap();
 
-        let pulses = singleton!(: Pulses = Pulses::new()).unwrap();
+        let pulses = singleton!(: Pulses = Pulses::new(monotonics::now())).unwrap();
 
         let next_pulses = singleton!(: UnadjustedPulses = UnadjustedPulses::new()).unwrap();
 

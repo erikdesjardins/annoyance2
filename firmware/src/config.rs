@@ -1,3 +1,5 @@
+use crate::math::ScaleBy;
+
 pub fn dump_to_log() {
     defmt::info!(
         "\n\
@@ -45,7 +47,8 @@ pub fn dump_to_log() {
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
         - DURATION_RANGE: {}.{} .. {}.{} us\n\
-        - SCHEDULING_OFFSET: {}.{} us\n\
+        - HOLDOFF_RATIO: {}%\n\
+        - MIN_HOLDOFF: {}.{} us\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -91,8 +94,9 @@ pub fn dump_to_log() {
         pulse::DURATION_RANGE.start.to_nanos() % 1000,
         pulse::DURATION_RANGE.end.to_nanos() / 1000,
         pulse::DURATION_RANGE.end.to_nanos() % 1000,
-        pulse::SCHEDULING_OFFSET.to_nanos() / 1000,
-        pulse::SCHEDULING_OFFSET.to_nanos() % 1000,
+        100u16.scale_by(pulse::HOLDOFF_RATIO),
+        pulse::MIN_HOLDOFF.to_nanos() / 1000,
+        pulse::MIN_HOLDOFF.to_nanos() % 1000,
     );
 }
 
@@ -346,6 +350,7 @@ pub mod indicator {
 
 /// Pulse generation configuration
 pub mod pulse {
+    use crate::math::ScalingFactor;
     use crate::time::{Duration, PulseDuration};
     use core::ops::Range;
 
@@ -353,11 +358,18 @@ pub mod pulse {
     pub const DURATION_RANGE: Range<PulseDuration> =
         PulseDuration::micros(1)..PulseDuration::micros(10);
 
-    /// Start scheduling pulses this far in the future.
+    /// Duration of the holdoff period after a pulse is sent.
+    /// This helps make low frequencies more noticeable, by suppressing additional pulses for the given fraction of a period.
+    /// For example, with the holdoff ratio set to 1/2, a 1 Hz pulse will suppress other frequencies for 500 ms.
+    ///
+    /// The minimum holdoff time is SCHEDULING_OFFSET, as that option has the same kind of effect.
+    pub const HOLDOFF_RATIO: ScalingFactor<u16> = ScalingFactor::from_ratio(1, 2);
+
+    /// Minimum holdoff period.
     ///
     /// This ensures that we don't try to schedule a pulse, e.g., just 1 tick after the current time,
     /// causing us to miss the deadline (and wait until the timer wraps).
     ///
     /// It also provides a minimum repeat rate, for the same reason.
-    pub const SCHEDULING_OFFSET: Duration = Duration::micros(50);
+    pub const MIN_HOLDOFF: Duration = Duration::micros(50);
 }

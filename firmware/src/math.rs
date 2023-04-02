@@ -1,4 +1,5 @@
 use crate::panic::OptionalExt;
+use crate::time::Duration;
 use defmt::Format;
 use fixed::types::{I16F48, U32F0};
 use fixed_sqrt::FixedSqrt;
@@ -134,6 +135,12 @@ impl_scaleby!(i16, by: u16, via: i32, const_scale_by_i16_u16);
 impl_scaleby!(i32, by: u16, via: i64, const_scale_by_i32_u16);
 impl_scaleby!(u16, by: u16, via: u32, const_scale_by_u16_u16);
 impl_scaleby!(u32, by: u16, via: u64, const_scale_by_u32_u16);
+
+impl ScaleBy<u16> for Duration {
+    fn scale_by(self, by: ScalingFactor<u16>) -> Self {
+        Self::from_ticks(self.ticks().scale_by(by))
+    }
+}
 
 /// Integer truncation, checked in debug mode.
 pub trait Truncate<To> {
