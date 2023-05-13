@@ -42,6 +42,7 @@ pub fn dump_to_log() {
         FFT analysis:\n\
         - MAX_SCRATCH_PEAKS: {}\n\
         - MAX_PEAKS: {}\n\
+        - MIN_FREQ: {} Hz\n\
         - NOISE_FLOOR_AMPLITUDE: {}\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
@@ -88,6 +89,7 @@ pub fn dump_to_log() {
         fft::MAX_AMPLITUDE,
         fft::analysis::MAX_SCRATCH_PEAKS,
         fft::analysis::MAX_PEAKS,
+        fft::analysis::MIN_FREQ,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
         indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION_RANGE.start.to_nanos() / 1000,
@@ -334,6 +336,11 @@ pub mod fft {
 
         /// Maximum number of above-threshold peaks to find in the FFT spectrum.
         pub const MAX_PEAKS: usize = 8;
+
+        /// Minumum frequency for a peak to be considered valid.
+        /// Frequencies lower than the buffer swap rate cannot ever be output, so there's no point in considering them.
+        /// Also, super low frequencies can cause excessively long holdoff.
+        pub const MIN_FREQ: usize = config::adc::BUFFERS_PER_SEC;
 
         /// Min amplitude for a FFT bin to be considered a peak.
         /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
