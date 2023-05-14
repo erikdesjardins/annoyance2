@@ -44,6 +44,7 @@ pub fn dump_to_log() {
         - MAX_PEAKS: {}\n\
         - MIN_FREQ: {} Hz\n\
         - NOISE_FLOOR_AMPLITUDE: {}\n\
+        - NIGHTCORE: {}%\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
@@ -91,6 +92,7 @@ pub fn dump_to_log() {
         fft::analysis::MAX_PEAKS,
         fft::analysis::MIN_FREQ,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
+        100u16.scale_by(fft::analysis::NIGHTCORE),
         indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION_RANGE.start.to_nanos() / 1000,
         pulse::DURATION_RANGE.start.to_nanos() % 1000,
@@ -325,6 +327,7 @@ pub mod fft {
 
     pub mod analysis {
         use crate::config;
+        use crate::math::ScalingFactor;
 
         /// Maximum number of possible "scratch peaks" that could occur in the raw FFT spectrum.
         pub const MAX_SCRATCH_PEAKS: usize = {
@@ -342,9 +345,17 @@ pub mod fft {
         /// Also, super low frequencies can cause excessively long holdoff.
         pub const MIN_FREQ: usize = config::adc::BUFFERS_PER_SEC;
 
+        /// Maximum frequency allowed.
+        /// At the default value of `fft::MAX_FREQ`, this does not impose any additional limit (beyond the inherent limit of the FFT),
+        /// unless nightcore is enabled, which would otherwise allow much higher frequencies.
+        pub const MAX_FREQ: u16 = config::fft::MAX_FREQ;
+
         /// Min amplitude for a FFT bin to be considered a peak.
         /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
         pub const NOISE_FLOOR_AMPLITUDE: u16 = 100;
+
+        /// All frequencies are increased by this factor.
+        pub const NIGHTCORE: ScalingFactor<u16> = ScalingFactor::from_ratio(0, 100);
     }
 }
 

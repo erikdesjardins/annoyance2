@@ -11,11 +11,6 @@ use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
 
-const ONE_HZ: NonZeroU16 = match NonZeroU16::new(1) {
-    Some(f) => f,
-    None => unreachable!(),
-};
-
 #[derive(Copy, Clone)]
 pub struct ScratchPeak {
     center: Option<NonZeroU16>,
@@ -274,8 +269,17 @@ pub fn find_peaks(
                 let real_freq = real_freq_x1000.div_round(1000);
                 // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
                 let real_freq: u16 = real_freq.truncate();
-                // ensure freq is nonzero
-                let real_freq = NonZeroU16::new(real_freq).unwrap_or(ONE_HZ);
+
+                // Step 6.6: apply nightcore adjustment
+                let real_freq = real_freq + real_freq.scale_by(config::fft::analysis::NIGHTCORE);
+
+                // Step 6.7: ensure frequency is valid
+                if real_freq > config::fft::analysis::MAX_FREQ {
+                    continue;
+                }
+                let Some(real_freq) = NonZeroU16::new(real_freq) else {
+                    continue;
+                };
 
                 // Step 6.6: store adjusted frequency
                 real_freq
