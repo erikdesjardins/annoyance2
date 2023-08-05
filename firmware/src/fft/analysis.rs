@@ -11,11 +11,6 @@ use num_complex::Complex;
 
 const FIRST_NON_DC_BIN: usize = 1;
 
-const ONE_HZ: NonZeroU16 = match NonZeroU16::new(1) {
-    Some(f) => f,
-    None => unreachable!(),
-};
-
 #[derive(Copy, Clone)]
 pub struct ScratchPeak {
     center: Option<NonZeroU16>,
@@ -120,6 +115,7 @@ pub fn find_peaks(
 
         let mut absolute_highest_amplitude = None;
 
+        // For each slot in our output buffer...
         for _ in 0..peaks_out.capacity() {
             // Step 1: find highest non-consumed peak
             let mut scratch_iter = scratch_peaks.iter_mut();
@@ -157,15 +153,22 @@ pub fn find_peaks(
             #[allow(unused_variables)]
             let max_peak = ();
 
-            // Step 3: compute non-squared max amplitude
+            // Step 3: cull peaks below min frequency
+            let min_freq_bin = (config::fft::analysis::MIN_FREQ * 1000)
+                .div_round(config::fft::FREQ_RESOLUTION_X1000);
+            if max_peak_i <= min_freq_bin {
+                continue;
+            }
+
+            // Step 4: compute non-squared max amplitude
             let max_amplitude = amplitude_sqrt(max_amplitude_squared);
 
-            // Step 4: cull peaks below noise floor
+            // Step 5: cull peaks below noise floor
             if max_amplitude < config::fft::analysis::NOISE_FLOOR_AMPLITUDE {
                 break;
             }
 
-            // Step 5: cull peaks below threshold
+            // Step 6: cull peaks below threshold
             match absolute_highest_amplitude {
                 None => {
                     // no highest peak yet, set it to this peak (the first and highest peak)
@@ -182,7 +185,7 @@ pub fn find_peaks(
                 }
             }
 
-            // Step 6: refine the peak frequency based on shape of the peak
+            // Step 7: refine the peak frequency based on shape of the peak
             //
             // For example:
             //
@@ -266,17 +269,27 @@ pub fn find_peaks(
                 let real_freq = real_freq_x1000.div_round(1000);
                 // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
                 let real_freq: u16 = real_freq.truncate();
-                // ensure freq is nonzero
-                let real_freq = NonZeroU16::new(real_freq).unwrap_or(ONE_HZ);
 
-                // Step 6.6: store adjusted frequency
+                // Step 6.6: ensure frequency is valid
+                let Some(real_freq) = NonZeroU16::new(real_freq) else {
+                    continue;
+                };
+
                 real_freq
             };
 
-            // Step 7: store peak
-            peaks_out
-                .push(Peak::from_bin_and_freq(bins[max_peak_i], freq))
-                .unwrap_or_else(|_| panic!("too many peaks found (impossible)"));
+            // Step 8: store peaks with harmonics
+            for harmonic in config::fft::analysis::HARMONICS {
+                // Step 8.1: compute harmonic frequency
+                let freq = freq.saturating_mul(harmonic);
+                if freq > config::fft::analysis::MAX_FREQ {
+                    break;
+                }
+
+                if let Err(_) = peaks_out.push(Peak::from_bin_and_freq(bins[max_peak_i], freq)) {
+                    break;
+                }
+            }
         }
     }
 }

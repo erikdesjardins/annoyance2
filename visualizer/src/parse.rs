@@ -42,7 +42,7 @@ pub fn handle_line(state: &mut State, line: &str) -> Redraw {
         // Parse chart id
         let Some((chart_id, line)) = line.split_once(' ') else { return Err(ParseError::MissingChartId) };
         let chart_id = chart_id.parse()?;
-        let mut chart = state.get_or_create_chart(chart_id);
+        let chart = state.get_or_create_chart(chart_id);
 
         // Parse command
         let Some((command, args)) = line.split_once(' ') else { return Err(ParseError::MissingCommand) };

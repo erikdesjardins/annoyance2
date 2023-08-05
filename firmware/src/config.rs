@@ -1,3 +1,5 @@
+use crate::math::ScaleBy;
+
 pub fn dump_to_log() {
     defmt::info!(
         "\n\
@@ -40,12 +42,15 @@ pub fn dump_to_log() {
         FFT analysis:\n\
         - MAX_SCRATCH_PEAKS: {}\n\
         - MAX_PEAKS: {}\n\
+        - MIN_FREQ: {} Hz\n\
         - NOISE_FLOOR_AMPLITUDE: {}\n\
+        - HARMONICS: {}\n\
         Indicator LEDs:\n\
         - PWM_FREQ: {} Hz\n\
         Pulse generation:\n\
         - DURATION_RANGE: {}.{} .. {}.{} us\n\
-        - SCHEDULING_OFFSET: {}.{} us\n\
+        - HOLDOFF_RATIO: {}%\n\
+        - MIN_HOLDOFF: {}.{} us\n\
         ",
         debug::FAKE_INPUT_DATA,
         debug::FAKE_INPUT_CYCLES_PER_BUF,
@@ -85,14 +90,17 @@ pub fn dump_to_log() {
         fft::MAX_AMPLITUDE,
         fft::analysis::MAX_SCRATCH_PEAKS,
         fft::analysis::MAX_PEAKS,
+        fft::analysis::MIN_FREQ,
         fft::analysis::NOISE_FLOOR_AMPLITUDE,
+        fft::analysis::HARMONICS,
         indicator::PWM_FREQ.to_Hz(),
         pulse::DURATION_RANGE.start.to_nanos() / 1000,
         pulse::DURATION_RANGE.start.to_nanos() % 1000,
         pulse::DURATION_RANGE.end.to_nanos() / 1000,
         pulse::DURATION_RANGE.end.to_nanos() % 1000,
-        pulse::SCHEDULING_OFFSET.to_nanos() / 1000,
-        pulse::SCHEDULING_OFFSET.to_nanos() % 1000,
+        100u16.scale_by(pulse::HOLDOFF_RATIO),
+        pulse::MIN_HOLDOFF.to_nanos() / 1000,
+        pulse::MIN_HOLDOFF.to_nanos() % 1000,
     );
 }
 
@@ -319,6 +327,8 @@ pub mod fft {
 
     pub mod analysis {
         use crate::config;
+        use crate::panic::unwrap;
+        use core::num::NonZeroU16;
 
         /// Maximum number of possible "scratch peaks" that could occur in the raw FFT spectrum.
         pub const MAX_SCRATCH_PEAKS: usize = {
@@ -331,9 +341,23 @@ pub mod fft {
         /// Maximum number of above-threshold peaks to find in the FFT spectrum.
         pub const MAX_PEAKS: usize = 8;
 
+        /// Minumum frequency for a peak to be considered valid.
+        /// Frequencies lower than the buffer swap rate cannot ever be output, so there's no point in considering them.
+        /// Also, super low frequencies can cause excessively long holdoff.
+        pub const MIN_FREQ: usize = config::adc::BUFFERS_PER_SEC;
+
+        /// Maximum frequency allowed.
+        /// At the default value of `fft::MAX_FREQ`, this does not impose any additional limit (beyond the inherent limit of the FFT),
+        /// unless additional `HARMONICS` are enabled, which would otherwise allow much higher frequencies.
+        pub const MAX_FREQ: NonZeroU16 = unwrap(NonZeroU16::new(config::fft::MAX_FREQ));
+
         /// Min amplitude for a FFT bin to be considered a peak.
         /// In addition to this threshold, another threshold is applied in proportion to the amplitude of the highest peak.
         pub const NOISE_FLOOR_AMPLITUDE: u16 = 100;
+
+        /// Artifically add harmonics of each frequency (provided they're below `MAX_FREQ`).
+        pub const HARMONICS: [NonZeroU16; 2] =
+            [unwrap(NonZeroU16::new(1)), unwrap(NonZeroU16::new(3))];
     }
 }
 
@@ -346,6 +370,7 @@ pub mod indicator {
 
 /// Pulse generation configuration
 pub mod pulse {
+    use crate::math::ScalingFactor;
     use crate::time::{Duration, PulseDuration};
     use core::ops::Range;
 
@@ -353,11 +378,18 @@ pub mod pulse {
     pub const DURATION_RANGE: Range<PulseDuration> =
         PulseDuration::micros(1)..PulseDuration::micros(10);
 
-    /// Start scheduling pulses this far in the future.
+    /// Duration of the holdoff period after a pulse is sent.
+    /// This helps make low frequencies more noticeable, by suppressing additional pulses for the given fraction of a period.
+    /// For example, with the holdoff ratio set to 1/2, a 1 Hz pulse will suppress other frequencies for 500 ms.
+    ///
+    /// The minimum holdoff time is SCHEDULING_OFFSET, as that option has the same kind of effect.
+    pub const HOLDOFF_RATIO: ScalingFactor<u16> = ScalingFactor::from_ratio(1, 2);
+
+    /// Minimum holdoff period.
     ///
     /// This ensures that we don't try to schedule a pulse, e.g., just 1 tick after the current time,
     /// causing us to miss the deadline (and wait until the timer wraps).
     ///
     /// It also provides a minimum repeat rate, for the same reason.
-    pub const SCHEDULING_OFFSET: Duration = Duration::micros(50);
+    pub const MIN_HOLDOFF: Duration = Duration::micros(50);
 }

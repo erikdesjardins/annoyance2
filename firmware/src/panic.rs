@@ -1,3 +1,10 @@
+pub const fn unwrap<T: Copy>(x: Option<T>) -> T {
+    match x {
+        Some(x) => x,
+        None => panic!("unwrap failed"),
+    }
+}
+
 pub trait OptionalExt {
     type Value;
 

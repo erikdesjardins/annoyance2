@@ -79,7 +79,7 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
                     .set_bit()
             });
             // CCR must be > 0, but is otherwise ignored here due to fast enable
-            self.tim.ccr1.write(|w| w.ccr().bits(1));
+            self.tim.ccr1().write(|w| w.ccr().bits(1));
             // Enable the capture/compare channel
             self.tim.ccer.modify(|_, w| w.cc1e().set_bit());
         }
@@ -87,21 +87,21 @@ impl<const FREQ: u32> OneshotTimer<TIM1, FREQ> {
             self.tim
                 .ccmr1_output()
                 .modify(|_, w| w.oc2pe().set_bit().oc2m().bits(mode as _).oc2fe().set_bit());
-            self.tim.ccr2.write(|w| w.ccr().bits(1));
+            self.tim.ccr2().write(|w| w.ccr().bits(1));
             self.tim.ccer.modify(|_, w| w.cc2e().set_bit());
         }
         if PINS::C3 {
             self.tim
                 .ccmr2_output()
                 .modify(|_, w| w.oc3pe().set_bit().oc3m().bits(mode as _).oc3fe().set_bit());
-            self.tim.ccr3.write(|w| w.ccr().bits(1));
+            self.tim.ccr3().write(|w| w.ccr().bits(1));
             self.tim.ccer.modify(|_, w| w.cc3e().set_bit());
         }
         if PINS::C4 {
             self.tim
                 .ccmr2_output()
                 .modify(|_, w| w.oc4pe().set_bit().oc4m().bits(mode as _).oc4fe().set_bit());
-            self.tim.ccr4.write(|w| w.ccr().bits(1));
+            self.tim.ccr4().write(|w| w.ccr().bits(1));
             self.tim.ccer.modify(|_, w| w.cc4e().set_bit());
         }
 
@@ -126,7 +126,7 @@ where
     REMAP: Remap<Periph = TIM1>,
     PINS: Pins<REMAP, P>,
 {
-    pub fn fire(&mut self, pulse_time: Duration<u32, 1, FREQ>) {
+    pub fn set_pulse_time(&mut self, pulse_time: Duration<u32, 1, FREQ>) {
         // time is ARR - CCR + 1, so subtract 1 tick
         // (note that CCR is effectively 0 here due to fast enable)
         self.timer.tim.arr.write(|w| {
@@ -136,7 +136,9 @@ where
                 ticks.try_into().unwrap()
             })
         });
+    }
 
+    pub fn fire(&mut self) {
         // enable one pulse mode and start the timer
         self.timer
             .tim

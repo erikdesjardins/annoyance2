@@ -41,13 +41,13 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
         let inverse_stage = N_LOG2 - 1 - STAGE;
         let stride = 1 << STAGE;
         let step = stride << 1;
-        for m in 0..stride {
+        (0..stride).for_each(|m| {
             // compute twiddle factors
             let iw = m << inverse_stage;
             let wr = i32::from(SIN_TABLE[iw + N / 4] >> SCALE);
             let wi = i32::from(-SIN_TABLE[iw] >> SCALE);
             #[allow(clippy::cast_possible_truncation)]
-            (m..N).into_iter().step_by(step).for_each(|i| {
+            (m..N).step_by(step).for_each(|i| {
                 let j = i + stride;
                 // apply twiddle factors
                 // round up based on the last bit that's about to be shifted out
@@ -67,7 +67,7 @@ pub fn radix2(f: &mut [Complex<i16>; N]) {
                 f[i].re = qr + tr;
                 f[i].im = qi + ti;
             });
-        }
+        });
     }
 
     run_stage::<0>(f);

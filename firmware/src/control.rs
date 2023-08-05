@@ -1,6 +1,5 @@
 use crate::config;
 use crate::math::{ScaleBy, ScalingFactor};
-use core::convert::identity;
 use core::ops::{Add, Range, Sub};
 use defmt::Format;
 
@@ -18,28 +17,16 @@ impl Sample {
     }
 
     /// Pick a value from a given range.
-    pub fn to_value_in_range(self, range: Range<u16>) -> u16 {
-        self.to_value_in_range_via(range, identity, identity)
-    }
-
-    /// Pick a value from a given range.
-    /// Performs the computation in a different type, then converts back to the original type via the given conversions.
-    pub fn to_value_in_range_via<Orig, Scalable>(
-        self,
-        range: Range<Orig>,
-        into: impl Fn(Orig) -> Scalable,
-        from: impl Fn(Scalable) -> Orig,
-    ) -> Orig
+    pub fn to_value_in_range<T>(self, range: Range<T>) -> T
     where
-        Orig: Copy,
-        Scalable: Add<Output = Scalable> + Sub<Output = Scalable> + ScaleBy<u16>,
+        T: Add<Output = T> + Sub<Output = T> + ScaleBy<u16> + Copy,
     {
         // split range into base value + additional size
-        let base = into(range.start);
-        let size = into(range.end) - into(range.start);
+        let base = range.start;
+        let size = range.end - range.start;
 
         // pick a value in the range
-        let value = from(base + size.scale_by(self.value));
+        let value = base + size.scale_by(self.value);
 
         value
     }

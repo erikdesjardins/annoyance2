@@ -1,6 +1,6 @@
 use crate::config;
 use crate::fft::analysis::Peak;
-use crate::math::{ScalingFactor, Truncate};
+use crate::math::{DivRound, ScalingFactor, Truncate};
 use crate::panic::OptionalExt;
 use heapless::Vec;
 
@@ -41,7 +41,7 @@ pub fn amplitude(input: &[u16; config::adc::BUF_LEN_RAW]) -> [ScalingFactor<u16>
     // shift down from `max_possible_sample/2..=max_possible_sample` to `0..=max_possible_sample/2`
     // and then scale up to `0..=max_possible_sample`
     let adjusted_closeness_to_half_max_sample =
-        (closeness_to_max_possible_sample - (max_possible_sample / 2)) * 2;
+        (closeness_to_max_possible_sample - max_possible_sample.div_round(2)) * 2;
 
     // scale up from ADC sample range to full u16 range
     let overall_factor = ScalingFactor::from_sample::<{ config::adc::RESOLUTION_BITS }>(

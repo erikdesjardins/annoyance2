@@ -6,10 +6,10 @@ version = "1.1.2"
 
 [dependencies]
 cordic = "0.1"
-cortex-m = "0.7"
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
 cortex-m-rtic = "1"
 defmt = "0.3"
-defmt-rtt = "0.3"
+defmt-rtt = "0.4"
 dwt-systick-monotonic = "1"
 embedded-hal = "0.2"
 fixed = "1"
@@ -18,7 +18,7 @@ fugit = "0.3"
 heapless = "0.7"
 num-complex = { version = "0.4", default-features = false }
 panic-probe = { version = "0.3", features = ["print-defmt"] }
-stm32f1xx-hal = { version = "0.9", features = ["stm32f103", "medium", "rtic"] }
+stm32f1xx-hal = { version = "0.10", features = ["stm32f103", "medium", "rtic"] }
 
 [profile.dev]
 codegen-units = 1

@@ -41,6 +41,8 @@ cargo run --manifest-path firmware/Cargo.toml --target thumbv7m-none-eabi --rele
 
 ### Misc
 
-```
-cargo objdump --release --bin main -- --disassemble --no-show-raw-insn --print-imm-hex
+```sh
+cargo objdump --target thumbv7m-none-eabi --release -- --disassemble --no-show-raw-insn --print-imm-hex
+
+cargo objdump --target thumbv7m-none-eabi --release -- --disassemble --no-show-raw-insn --print-imm-hex --disassemble-symbols=USART1
 ```
