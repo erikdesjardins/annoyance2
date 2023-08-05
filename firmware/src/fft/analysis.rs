@@ -270,25 +270,26 @@ pub fn find_peaks(
                 // truncate frequency: we expect to only be working with < 10 kHz, which is less than u16::MAX
                 let real_freq: u16 = real_freq.truncate();
 
-                // Step 6.6: apply nightcore adjustment
-                let real_freq = real_freq + real_freq.scale_by(config::fft::analysis::NIGHTCORE);
-
-                // Step 6.7: ensure frequency is valid
-                if real_freq > config::fft::analysis::MAX_FREQ {
-                    continue;
-                }
+                // Step 6.6: ensure frequency is valid
                 let Some(real_freq) = NonZeroU16::new(real_freq) else {
                     continue;
                 };
 
-                // Step 6.6: store adjusted frequency
                 real_freq
             };
 
-            // Step 8: store peak
-            peaks_out
-                .push(Peak::from_bin_and_freq(bins[max_peak_i], freq))
-                .unwrap_or_else(|_| panic!("too many peaks found (impossible)"));
+            // Step 8: store peaks with harmonics
+            for harmonic in config::fft::analysis::HARMONICS {
+                // Step 8.1: compute harmonic frequency
+                let freq = freq.saturating_mul(harmonic);
+                if freq > config::fft::analysis::MAX_FREQ {
+                    break;
+                }
+
+                if let Err(_) = peaks_out.push(Peak::from_bin_and_freq(bins[max_peak_i], freq)) {
+                    break;
+                }
+            }
         }
     }
 }
